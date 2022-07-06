@@ -1,7 +1,4 @@
-type Partition = string;
-type JSONObject<T> = {
-  [key: string]: T;
-};
+import type { JSONObject, Partition } from '../helper/types';
 
 export class Message<T> {
   #partition: Partition;
