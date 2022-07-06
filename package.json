@@ -1,0 +1,27 @@
+{
+  "name": "actor-bonilla",
+  "version": "1.0.0",
+  "description": "An actor model implementation in Typescript (it's just a silly pun don't expect this to work or to be finished sometime)",
+  "main": "dist/index.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "keywords": [
+    "actor model",
+    "bonilla",
+    "typescript",
+    "ts",
+    "actor system",
+    "concurrency",
+    "parallel"
+  ],
+  "author": "Gustavo Cavalcante <nowayhecodes@gmail.com>",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/jest": "^28.1.4",
+    "@types/node": "^18.0.2",
+    "jest": "^28.1.2",
+    "ts-node": "^10.8.2",
+    "typescript": "^4.7.4"
+  }
+}
