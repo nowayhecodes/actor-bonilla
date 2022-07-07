@@ -16,3 +16,13 @@ export type Provider<T> = Pick<EventTarget, 'dispatchEvent'> & {
   onMessage: (listener: EventEmitter) => void;
   postMessage: (message: Message<T>) => Promise<void> | void;
 };
+
+export type Processor = {
+  requirements: string[];
+  process: () => void;
+};
+
+export type FiberConfig = {
+  resources: string[];
+  tickInterval: number;
+};
