@@ -1,3 +1,4 @@
+import { EventEmitter } from 'stream';
 import { Message } from '../mail/message';
 
 export type Partition = string;
@@ -12,6 +13,6 @@ export type Subscriber<T> = {
 };
 
 export type Provider<T> = Pick<EventTarget, 'dispatchEvent'> & {
-  onMessage: (listener: EventListener) => void;
+  onMessage: (listener: EventEmitter) => void;
   postMessage: (message: Message<T>) => Promise<void> | void;
 };
