@@ -10,3 +10,8 @@ export type Subscriber<T> = {
   partitions: Partition[];
   onReceive(message: Message<T>): Promise<boolean>;
 };
+
+export type Provider<T> = Pick<EventTarget, 'dispatchEvent'> & {
+  onMessage: (listener: EventListener) => void;
+  postMessage: (message: Message<T>) => Promise<void> | void;
+};
