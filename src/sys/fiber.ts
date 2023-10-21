@@ -7,6 +7,11 @@ export class Fiber {
 
   public readonly name: string;
 
+  /**
+   * Constructor for the class.
+   *
+   * @param {FiberConfig} config - the configuration object for the class
+   */
   constructor(private config: FiberConfig) {
     const { resources, tickInterval } = config;
     this.#config = config;
@@ -18,6 +23,12 @@ export class Fiber {
     this.#timerId = setInterval(this.#tick.bind(this), tickInterval);
   }
 
+  /**
+   * Acquires a processor if all requirements are met.
+   *
+   * @param {Processor} processor - The processor to acquire.
+   * @return {boolean} Returns true if the processor was acquired, otherwise false.
+   */
   public acquire(processor: Processor): boolean {
     if (
       processor.requirements.every(
