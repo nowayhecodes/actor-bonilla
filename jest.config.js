@@ -4,6 +4,8 @@ module.exports = {
   coverageProvider: 'v8',
   coverageReporters: ['text', 'lcov'],
   moduleFileExtensions: ['js', 'ts'],
-  preset: ['ts-jest'],
   testMatch: ['**/tests/**/*.[jt]s?(x)', '**/?(*.)+(spec|test).[tj]s?(x)'],
+  transform: {
+    '^.+\\.(t|j)sx?$': '@swc/jest',
+  },
 };
