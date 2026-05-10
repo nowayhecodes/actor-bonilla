@@ -12,6 +12,7 @@ export {
   type SupervisionStrategy,
   type CancelToken,
   type TerminatedMessage,
+  type LifecycleSignal,
   type DeadLetter,
   type RouterConfig,
   type ActorSystemConfig,

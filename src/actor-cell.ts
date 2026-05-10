@@ -16,6 +16,7 @@ import type {
   TerminatedMessage,
   DeadLetter,
   AskReplyMessage,
+  LifecycleSignal,
 } from './types.js';
 import {
   SupervisionDirective,
@@ -365,7 +366,7 @@ export class ActorCell<T = unknown> implements ActorRef<T>, ActorContext<T> {
     this.invokeLifecycleHook(PreStart);
   }
 
-  private async invokeLifecycleHook(signal: symbol): Promise<void> {
+  private async invokeLifecycleHook(signal: LifecycleSignal): Promise<void> {
     try {
       await this.currentBehavior(signal as any, this);
     } catch {
