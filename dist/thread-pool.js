@@ -262,6 +262,9 @@ export class ThreadPoolRef {
         this.pool.sendStop(this.workerIndex, this.path);
     }
 }
+// ============================================================================
+// ThreadPool — manages a pool of worker threads (main thread side)
+// ============================================================================
 /**
  * ThreadPool manages a pool of worker threads, each running a WorkerShard.
  * Actors are distributed across workers using round-robin or explicit assignment.

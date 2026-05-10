@@ -1,4 +1,4 @@
-import type { ActorRef } from './types.js';
+import type { ActorRef, ThreadPoolConfig, ThreadedProps } from './types.js';
 export declare const enum WorkerMsgType {
     CreateActor = 1,
     Tell = 2,
@@ -81,24 +81,6 @@ export interface ErrorMsg {
 export type MainToWorkerMsg = CreateActorMsg | TellMsg | AskMsg | StopActorMsg | ShutdownMsg;
 export type WorkerToMainMsg = ActorCreatedMsg | TellProxyMsg | AskReplyMsg | ActorStoppedMsg | LogMsg | ErrorMsg;
 /**
- * A ThreadedProps describes how to create an actor on a worker thread.
- * Since functions can't cross thread boundaries, we specify the behavior
- * as a module path + export name (factory pattern).
- *
- * The module must export a factory function:
- *   export function myBehavior(arg1: string, arg2: number): ThreadedReceive<MyMsg> { ... }
- *
- * The factory returns a ThreadedReceive — the message handler.
- */
-export interface ThreadedProps {
-    /** Absolute path or URL to the module. */
-    behaviorModule: string;
-    /** Name of the exported factory function. */
-    behaviorExport: string;
-    /** Serializable arguments for the factory. */
-    behaviorArgs?: any[];
-}
-/**
  * ThreadedReceive is the handler function running inside a worker.
  * It gets a simplified context (no direct ActorRef objects — only paths
  * and a `tell` function that routes through the main thread).
@@ -130,12 +112,6 @@ export declare class ThreadPoolRef<T = unknown> implements ActorRef<T> {
     tell(message: T, sender?: ActorRef<any> | null): void;
     ask<R>(message: T, timeoutMs?: number): Promise<R>;
     stop(): void;
-}
-export interface ThreadPoolConfig {
-    /** Number of worker threads. Defaults to (cpus - 1), min 1. */
-    poolSize?: number;
-    /** Path to the worker script. Defaults to this file. */
-    workerScript?: string;
 }
 /**
  * ThreadPool manages a pool of worker threads, each running a WorkerShard.

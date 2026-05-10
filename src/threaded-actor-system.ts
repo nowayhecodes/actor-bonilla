@@ -6,14 +6,15 @@
 // communicate transparently.
 // ============================================================================
 
-import type { ActorRef, Props, ActorSystemConfig } from './types.js';
+import type {
+  ActorRef,
+  Props,
+  ActorSystemConfig,
+  ThreadPoolConfig,
+  ThreadedProps,
+} from './types.js';
 import { ActorSystem } from './actor-system.js';
-import {
-  ThreadPool,
-  ThreadPoolRef,
-  type ThreadPoolConfig,
-  type ThreadedProps,
-} from './thread-pool.js';
+import { ThreadPool, ThreadPoolRef } from './thread-pool.js';
 
 export interface ThreadedActorSystemConfig extends ActorSystemConfig {
   /** Thread pool configuration. */

@@ -1,5 +1,5 @@
 import { ActorSystem } from './actor-system.js';
-import { ThreadPool, ThreadPoolRef, } from './thread-pool.js';
+import { ThreadPool, ThreadPoolRef } from './thread-pool.js';
 /**
  * ThreadedActorSystem supports both:
  *  - Local actors (processed on the main thread event loop, like before)

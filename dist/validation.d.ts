@@ -1,5 +1,4 @@
-import type { ActorSystemConfig } from './types.js';
-import type { ThreadPoolConfig, ThreadedProps } from './thread-pool.js';
+import type { ActorSystemConfig, ThreadPoolConfig, ThreadedProps } from './types.js';
 /** Validates user-supplied actor system options before construction. */
 export declare const assertActorSystemConfig: (input: unknown) => ActorSystemConfig;
 /** Validates thread pool options (worker count, script path). */

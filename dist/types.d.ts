@@ -1,3 +1,4 @@
+import type { tags } from 'typia';
 /**
  * Envelope wraps every message with metadata for routing, dead-letter
  * handling, and sender tracking.
@@ -83,8 +84,8 @@ export declare enum SupervisionDirective {
 }
 export interface SupervisionStrategy {
     readonly type: 'one-for-one' | 'all-for-one';
-    readonly maxRetries: number;
-    readonly withinMs: number;
+    readonly maxRetries: number & tags.Minimum<0>;
+    readonly withinMs: number & tags.Minimum<0>;
     readonly decider: (error: Error) => SupervisionDirective;
 }
 export declare function oneForOneStrategy(maxRetries: number, withinMs: number, decider: (error: Error) => SupervisionDirective): SupervisionStrategy;
@@ -126,18 +127,37 @@ export declare enum RoutingStrategy {
 }
 export interface RouterConfig {
     readonly strategy: RoutingStrategy;
-    readonly nrOfInstances: number;
+    readonly nrOfInstances: number & tags.Minimum<1>;
     readonly props: Props<any>;
 }
 export interface ActorSystemConfig {
     /** Name of the actor system. */
-    name?: string;
+    name?: string & tags.MinLength<1>;
     /** Default dispatcher throughput (messages per batch). */
-    defaultThroughput?: number;
+    defaultThroughput?: number & tags.Minimum<1>;
     /** Enable dead letter logging. */
     logDeadLetters?: boolean;
     /** Maximum dead letters to log before silencing. */
-    maxDeadLettersLogged?: number;
+    maxDeadLettersLogged?: number & tags.Minimum<0>;
+}
+/**
+ * Describes how to create an actor on a worker thread (module path + export).
+ * Serializable across worker boundaries — see ThreadPool docs.
+ */
+export interface ThreadedProps {
+    /** Absolute path or URL to the module. */
+    behaviorModule: string & tags.MinLength<1>;
+    /** Name of the exported factory function. */
+    behaviorExport: string & tags.MinLength<1>;
+    /** Serializable arguments for the factory. */
+    behaviorArgs?: unknown[];
+}
+/** Options for `ThreadPool`. */
+export interface ThreadPoolConfig {
+    /** Number of worker threads. Defaults to (cpus - 1), min 1. */
+    poolSize?: number & tags.Minimum<1>;
+    /** Path to the worker script. Defaults to this module file. */
+    workerScript?: string & tags.MinLength<1>;
 }
 export declare const AskReply: unique symbol;
 export interface AskReplyMessage<R = unknown> {

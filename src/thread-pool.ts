@@ -36,7 +36,12 @@ import {
 } from 'node:worker_threads';
 import { cpus } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import type { ActorRef, CancelToken } from './types.js';
+import type {
+  ActorRef,
+  CancelToken,
+  ThreadPoolConfig,
+  ThreadedProps,
+} from './types.js';
 import { assertThreadPoolConfig, assertThreadedProps } from './validation.js';
 
 // ============================================================================
@@ -154,25 +159,6 @@ export type WorkerToMainMsg =
 // ============================================================================
 // BehaviorFactory — the serializable "Props" for threaded actors
 // ============================================================================
-
-/**
- * A ThreadedProps describes how to create an actor on a worker thread.
- * Since functions can't cross thread boundaries, we specify the behavior
- * as a module path + export name (factory pattern).
- *
- * The module must export a factory function:
- *   export function myBehavior(arg1: string, arg2: number): ThreadedReceive<MyMsg> { ... }
- *
- * The factory returns a ThreadedReceive — the message handler.
- */
-export interface ThreadedProps {
-  /** Absolute path or URL to the module. */
-  behaviorModule: string;
-  /** Name of the exported factory function. */
-  behaviorExport: string;
-  /** Serializable arguments for the factory. */
-  behaviorArgs?: any[];
-}
 
 /**
  * ThreadedReceive is the handler function running inside a worker.
@@ -478,13 +464,6 @@ export class ThreadPoolRef<T = unknown> implements ActorRef<T> {
 // ============================================================================
 // ThreadPool — manages a pool of worker threads (main thread side)
 // ============================================================================
-
-export interface ThreadPoolConfig {
-  /** Number of worker threads. Defaults to (cpus - 1), min 1. */
-  poolSize?: number;
-  /** Path to the worker script. Defaults to this file. */
-  workerScript?: string;
-}
 
 /**
  * ThreadPool manages a pool of worker threads, each running a WorkerShard.

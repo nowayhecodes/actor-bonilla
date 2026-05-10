@@ -4,8 +4,11 @@
 
 import typia from 'typia';
 
-import type { ActorSystemConfig } from './types.js';
-import type { ThreadPoolConfig, ThreadedProps } from './thread-pool.js';
+import type {
+  ActorSystemConfig,
+  ThreadPoolConfig,
+  ThreadedProps,
+} from './types.js';
 
 /** Validates user-supplied actor system options before construction. */
 export const assertActorSystemConfig =

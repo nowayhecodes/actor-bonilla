@@ -1,4 +1,4 @@
-export { type ActorRef, type ActorContext, type Receive, type Props, type Envelope, type SupervisionStrategy, type CancelToken, type TerminatedMessage, type LifecycleSignal, type DeadLetter, type RouterConfig, type ActorSystemConfig, type AskReplyMessage, type EventClassifier, type EventSubscriber, props, oneForOneStrategy, allForOneStrategy, SupervisionDirective, MailboxType, DispatcherType, RoutingStrategy, PreStart, PostStop, PreRestart, PostRestart, Terminated, PoisonPill, Kill, ReceiveTimeout, AskReply, } from './types.js';
+export { type ActorRef, type ActorContext, type Receive, type Props, type Envelope, type SupervisionStrategy, type CancelToken, type TerminatedMessage, type LifecycleSignal, type DeadLetter, type RouterConfig, type ActorSystemConfig, type ThreadPoolConfig, type ThreadedProps, type AskReplyMessage, type EventClassifier, type EventSubscriber, props, oneForOneStrategy, allForOneStrategy, SupervisionDirective, MailboxType, DispatcherType, RoutingStrategy, PreStart, PostStop, PreRestart, PostRestart, Terminated, PoisonPill, Kill, ReceiveTimeout, AskReply, } from './types.js';
 export { ActorSystem } from './actor-system.js';
 export { assertActorSystemConfig, assertThreadPoolConfig, assertThreadedProps, } from './validation.js';
 export { ActorCell } from './actor-cell.js';
@@ -8,4 +8,4 @@ export { EventStream, DEAD_LETTER_CHANNEL, LOG_CHANNEL, LIFECYCLE_CHANNEL, } fro
 export { Router } from './router.js';
 export { FSM, type FSMContext, type StateHandler, type StateResult, type TransitionHandler, } from './fsm.js';
 export { ThreadedActorSystem, type ThreadedActorSystemConfig, } from './threaded-actor-system.js';
-export { ThreadPool, ThreadPoolRef, WorkerMsgType, type ThreadPoolConfig, type ThreadedProps, type ThreadedReceive, type ThreadedActorContext, type MainToWorkerMsg, type WorkerToMainMsg, } from './thread-pool.js';
+export { ThreadPool, ThreadPoolRef, WorkerMsgType, type ThreadedReceive, type ThreadedActorContext, type MainToWorkerMsg, type WorkerToMainMsg, } from './thread-pool.js';

@@ -1,6 +1,6 @@
-import type { ActorRef, ActorSystemConfig } from './types.js';
+import type { ActorRef, ActorSystemConfig, ThreadPoolConfig, ThreadedProps } from './types.js';
 import { ActorSystem } from './actor-system.js';
-import { ThreadPool, type ThreadPoolConfig, type ThreadedProps } from './thread-pool.js';
+import { ThreadPool } from './thread-pool.js';
 export interface ThreadedActorSystemConfig extends ActorSystemConfig {
     /** Thread pool configuration. */
     threadPool?: ThreadPoolConfig;

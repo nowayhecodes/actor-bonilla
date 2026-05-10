@@ -3,8 +3,11 @@
  * This module mirrors the public API of `src/validation.ts` as no-ops so tests
  * exercise the rest of the runtime without failing at import time.
  */
-import type { ActorSystemConfig } from '../../src/types.ts';
-import type { ThreadPoolConfig, ThreadedProps } from '../../src/thread-pool.ts';
+import type {
+  ActorSystemConfig,
+  ThreadPoolConfig,
+  ThreadedProps,
+} from '../../src/types.ts';
 
 export function assertActorSystemConfig(_config: ActorSystemConfig): void {}
 
