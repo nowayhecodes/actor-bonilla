@@ -7,6 +7,8 @@ module.exports = {
   roots: ['<rootDir>/tests'],
   testMatch: ['**/tests/**/*.test.ts'],
   moduleNameMapper: {
+    '^.*[/\\\\]validation\\.js$': '<rootDir>/tests/stubs/validation.ts',
+    '^.*[/\\\\]validation\\.ts$': '<rootDir>/tests/stubs/validation.ts',
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
   transform: {

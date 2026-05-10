@@ -23,6 +23,13 @@ export class FSM {
     _initialState;
     _initialData;
     _stateTimeouts = new Map();
+    /**
+     * Create a new FSM builder with explicit type parameters.
+     * @example
+     * ```ts
+     * const builder = FSM.create<'idle' | 'running', number, MyMsg>();
+     * ```
+     */
     static create() {
         return new FSM();
     }

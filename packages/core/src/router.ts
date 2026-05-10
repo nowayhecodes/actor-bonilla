@@ -7,6 +7,7 @@
 import type { ActorRef, Props, RouterConfig, ActorContext } from './types.js';
 import { RoutingStrategy } from './types.js';
 import type { ActorCell } from './actor-cell.js';
+import { assertRouterConfig } from './validation.js';
 
 /**
  * Router distributes incoming messages to a pool of routee actors.
@@ -22,6 +23,7 @@ export class Router<T = unknown> {
     private readonly config: RouterConfig,
     private readonly context: ActorContext<any>
   ) {
+    assertRouterConfig(config);
     this.strategy = config.strategy;
 
     // Create the routee pool

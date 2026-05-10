@@ -1,0 +1,11 @@
+import type { RetryOptions, TimeoutOptions, Hooks, HttpMethod } from './types.js';
+export declare const RETRY_METHODS: HttpMethod[];
+export declare const RETRY_STATUS_CODES: number[];
+export declare const RETRY_ERROR_CODES: string[];
+export declare function defaultRetryDelay(retryCount: number, retryAfter?: number): number;
+export declare const DEFAULT_TIMEOUT: TimeoutOptions;
+export declare const DEFAULT_RETRY: RetryOptions;
+export declare const DEFAULT_HOOKS: Hooks;
+export declare const IDEMPOTENT_METHODS: ReadonlySet<string>;
+export declare const CACHEABLE_METHODS: ReadonlySet<string>;
+export declare const CACHEABLE_STATUS_CODES: ReadonlySet<number>;

@@ -42,7 +42,7 @@ export interface RetryObject {
 
 export interface RetryOptions {
   /** Number of retries after the first attempt. Must be >= 0. Default 2. */
-  limit: number & tags.Minimum<0>;
+  limit: number & tags.Minimum<0> & tags.Default<2>;
   /** Eligible HTTP methods. Default: idempotent set. */
   methods: HttpMethod[];
   /** Response status codes that trigger a retry. */
@@ -201,7 +201,8 @@ export interface Options {
   hooks?: Partial<{ [K in keyof Hooks]: Hooks[K] }>;
 
   followRedirects?: boolean;
-  maxRedirects?: number;
+  /** Maximum number of redirects to follow. Must be >= 0. Default 10. */
+  maxRedirects?: number & tags.Minimum<0>;
   decompress?: boolean;
 
   username?: string;
@@ -232,8 +233,8 @@ export interface Options {
   // ─── Actor system ─────────────────────────────────────────────────────────
   /** Provide an existing ActorSystem; otherwise one is created per HttpClient. */
   actorSystem?: ActorSystem;
-  /** Maximum concurrent in-flight requests. Default 256. */
-  maxConcurrent?: number;
+  /** Maximum concurrent in-flight requests. Must be >= 1. Default 256. */
+  maxConcurrent?: number & tags.Minimum<1>;
 
   // ─── Advanced ─────────────────────────────────────────────────────────────
   https?: HttpsOptions;
@@ -254,7 +255,7 @@ export interface NormalizedOptions {
   retry: RetryOptions;
   hooks: Hooks;
   followRedirects: boolean;
-  maxRedirects: number;
+  maxRedirects: number & tags.Minimum<0>;
   decompress: boolean;
   username?: string;
   password?: string;
@@ -268,7 +269,7 @@ export interface NormalizedOptions {
   onUploadProgress?: (progress: ProgressEvent) => void;
   onDownloadProgress?: (progress: ProgressEvent) => void;
   pagination?: PaginationOptions;
-  maxConcurrent: number;
+  maxConcurrent: number & tags.Minimum<1>;
   proxy?: string;
   https?: HttpsOptions;
 }

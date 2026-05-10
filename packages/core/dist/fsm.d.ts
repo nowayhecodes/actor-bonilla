@@ -57,6 +57,13 @@ export declare class FSM<TState extends string | number | symbol, TData, TMessag
     private _initialState;
     private _initialData;
     private _stateTimeouts;
+    /**
+     * Create a new FSM builder with explicit type parameters.
+     * @example
+     * ```ts
+     * const builder = FSM.create<'idle' | 'running', number, MyMsg>();
+     * ```
+     */
     static create<TState extends string | number | symbol, TData, TMessage>(): FSM<TState, TData, TMessage>;
     /** Set the initial state and data. */
     initialState(state: TState, data: TData): this;

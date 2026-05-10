@@ -1,4 +1,5 @@
 import { RoutingStrategy } from './types.js';
+import { assertRouterConfig } from './validation.js';
 /**
  * Router distributes incoming messages to a pool of routee actors.
  * Supports round-robin, random, broadcast, smallest-mailbox,
@@ -13,6 +14,7 @@ export class Router {
     constructor(config, context) {
         this.config = config;
         this.context = context;
+        assertRouterConfig(config);
         this.strategy = config.strategy;
         // Create the routee pool
         for (let i = 0; i < config.nrOfInstances; i++) {

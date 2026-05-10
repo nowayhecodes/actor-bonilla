@@ -17,7 +17,7 @@ import type { HttpResponse, PaginationOptions } from './types.js';
  */
 export function paginateByNextUrl<T = unknown>(
   getNextUrl: (response: HttpResponse) => string | null | undefined
-): PaginationOptions<T>['paginate'] {
+): NonNullable<PaginationOptions<T>['paginate']> {
   return (response) => {
     const nextUrl = getNextUrl(response);
     if (!nextUrl) return false;
@@ -41,7 +41,7 @@ export function paginateByOffset<T = unknown>(
   pageSize: number,
   getOffset: (response: HttpResponse) => number,
   totalField = 'total'
-): PaginationOptions<T>['paginate'] {
+): NonNullable<PaginationOptions<T>['paginate']> {
   return (response, _allItems, currentItems) => {
     if (currentItems.length < pageSize) return false;
     const total = (response.body as Record<string, number>)[totalField];
@@ -67,7 +67,7 @@ export function paginateByOffset<T = unknown>(
 export function paginateByPage<T = unknown>(
   pageSize: number,
   pageParam = 'page'
-): PaginationOptions<T>['paginate'] {
+): NonNullable<PaginationOptions<T>['paginate']> {
   let page = 1;
   return (_response, _allItems, currentItems) => {
     if (currentItems.length < pageSize) return false;
@@ -84,7 +84,7 @@ export function paginateByPage<T = unknown>(
  * const paginate = paginateByLinkHeader();
  * ```
  */
-export function paginateByLinkHeader<T = unknown>(): PaginationOptions<T>['paginate'] {
+export function paginateByLinkHeader<T = unknown>(): NonNullable<PaginationOptions<T>['paginate']> {
   return (response) => {
     const link = response.headers.get('link');
     if (!link) return false;
@@ -108,7 +108,7 @@ export function paginateByLinkHeader<T = unknown>(): PaginationOptions<T>['pagin
 export function paginateByCursor<T = unknown>(
   getCursor: (response: HttpResponse) => string | null | undefined,
   cursorParam = 'cursor'
-): PaginationOptions<T>['paginate'] {
+): NonNullable<PaginationOptions<T>['paginate']> {
   return (response) => {
     const cursor = getCursor(response);
     if (!cursor) return false;

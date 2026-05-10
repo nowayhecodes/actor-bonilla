@@ -6,10 +6,12 @@
     "prepare": "pnpm exec ts-patch install",
     "build": "pnpm -r run build",
     "test": "pnpm -r run test",
-    "test:coverage": "pnpm --filter @actor-bonilla/core run test:coverage",
+    "test:coverage": "pnpm -r run test:coverage",
     "demo": "pnpm --filter @actor-bonilla/core run demo",
+    "demo:http": "pnpm --filter @actor-bonilla/http run demo",
     "bench": "pnpm --filter @actor-bonilla/core run bench",
-    "prettier": "pnpm --filter @actor-bonilla/core run prettier"
+    "bench:http": "pnpm --filter @actor-bonilla/http run bench",
+    "prettier": "pnpm -r run prettier"
   },
   "keywords": [],
   "author": "Gustavo Cavalcante <nowayhecodes@gmail.com>",

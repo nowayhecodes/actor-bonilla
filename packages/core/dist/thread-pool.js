@@ -246,18 +246,30 @@ export class ThreadPoolRef {
     name;
     pool;
     workerIndex;
+    /**
+     * @param pool        The owning ThreadPool instance.
+     * @param workerIndex Index of the worker thread hosting this actor.
+     * @param path        Full hierarchical path of the actor (e.g. `/user/counter`).
+     * @param name        Simple actor name.
+     */
     constructor(pool, workerIndex, path, name) {
         this.pool = pool;
         this.workerIndex = workerIndex;
         this.path = path;
         this.name = name;
     }
+    /** Serialize and forward a fire-and-forget message to the worker-side actor. */
     tell(message, sender) {
         this.pool.sendTell(this.workerIndex, this.path, message, sender?.path ?? null);
     }
+    /**
+     * Serialize and forward a request; awaits the worker's reply.
+     * @param timeoutMs Milliseconds before the returned Promise rejects (default 5 000 ms).
+     */
     ask(message, timeoutMs = 5000) {
         return this.pool.sendAsk(this.workerIndex, this.path, message, timeoutMs);
     }
+    /** Request graceful termination of the worker-side actor. */
     stop() {
         this.pool.sendStop(this.workerIndex, this.path);
     }
@@ -285,6 +297,11 @@ export class ThreadPool {
     pendingCreations = new Map();
     // External handler for cross-worker routing
     onTellProxy = null;
+    /**
+     * @param config Thread pool options.
+     *               - `poolSize` — number of worker threads (default: logical CPUs − 1, min 1).
+     *               - `workerScript` — absolute path to the worker entry point (default: this file).
+     */
     constructor(config = {}) {
         assertThreadPoolConfig(config);
         this.poolSize = config.poolSize ?? Math.max(cpus().length - 1, 1);
@@ -340,6 +357,10 @@ export class ThreadPool {
     // ========================================================================
     // Message routing
     // ========================================================================
+    /**
+     * Deliver a fire-and-forget message to an actor on the specified worker.
+     * No-op when the pool has been shut down.
+     */
     sendTell(workerIndex, targetPath, message, senderPath) {
         if (!this.alive)
             return;
@@ -350,6 +371,10 @@ export class ThreadPool {
             senderPath,
         });
     }
+    /**
+     * Send an ask message to an actor on the specified worker and await a reply.
+     * @param timeoutMs How long to wait before rejecting the returned Promise.
+     */
     sendAsk(workerIndex, targetPath, message, timeoutMs) {
         return new Promise((resolve, reject) => {
             const correlationId = ++this.askCounter;
@@ -366,6 +391,7 @@ export class ThreadPool {
             });
         });
     }
+    /** Request graceful termination of a specific actor on the given worker. */
     sendStop(workerIndex, actorPath) {
         if (!this.alive)
             return;
@@ -456,6 +482,11 @@ export class ThreadPool {
     // ========================================================================
     // Shutdown
     // ========================================================================
+    /**
+     * Gracefully shut down the pool.
+     * Cancels all in-flight asks, sends a Shutdown message to each worker,
+     * and waits for all worker processes to exit (force-terminates after 2 s).
+     */
     async shutdown() {
         if (!this.alive)
             return;

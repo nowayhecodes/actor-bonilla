@@ -148,7 +148,7 @@ describe('Header merging', () => {
       await client.get('https://api.example.test/');
       const auth = capturedHeaders!.get('authorization') ?? '';
       expect(auth.startsWith('Basic ')).toBe(true);
-      const decoded = Buffer.from(auth.slice(6), 'base64').toString();
+      const decoded = atob(auth.slice(6));
       expect(decoded).toBe('admin:secret');
     } finally { restore(); await client.destroy(); }
   });
@@ -542,8 +542,8 @@ describe('HttpResponse object', () => {
     const client = new HttpClient();
     try {
       const resp = await client.get('https://api.example.test/', { responseType: 'buffer' });
-      expect(resp.body).toBeInstanceOf(Buffer);
-      expect((resp.body as Buffer).toString()).toBe('bytes');
+      expect(resp.body).toBeInstanceOf(Uint8Array);
+      expect(new TextDecoder().decode(resp.body as Uint8Array)).toBe('bytes');
     } finally { restore(); await client.destroy(); }
   });
 });

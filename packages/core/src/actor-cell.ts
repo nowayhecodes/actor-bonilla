@@ -40,6 +40,7 @@ import {
 import type { Dispatcher } from './dispatcher.js';
 import { DEAD_LETTER_CHANNEL, LIFECYCLE_CHANNEL } from './event-stream.js';
 import type { ActorSystem } from './actor-system.js';
+import { assertSupervisionStrategy } from './validation.js';
 
 // Global monotonic message ID counter for ordering
 let globalMessageId = 0;
@@ -110,6 +111,15 @@ export class ActorCell<T = unknown> implements ActorRef<T>, ActorContext<T> {
   // Throughput — messages per schedule run
   private readonly throughput: number;
 
+  /**
+   * @internal Created by `ActorSystem.createCell` — not part of the public API.
+   * @param system     The owning ActorSystem.
+   * @param parent     The parent ActorCell (null for top-level actors under /user).
+   * @param props      Actor configuration: behavior, mailbox type, dispatcher type, supervision.
+   * @param name       Simple actor name; combined with the parent path to form the full path.
+   * @param dispatcher Scheduler that drives mailbox processing.
+   * @param throughput Maximum messages processed per scheduling run before yielding.
+   */
   constructor(
     system: ActorSystem,
     parent: ActorCell<any> | null,
@@ -124,6 +134,9 @@ export class ActorCell<T = unknown> implements ActorRef<T>, ActorContext<T> {
     this.name = name;
     this.path = parent ? `${parent.path}/${name}` : `/${name}`;
     this.currentBehavior = props.receive;
+    if (props.supervisionStrategy !== undefined) {
+      assertSupervisionStrategy(props.supervisionStrategy);
+    }
     this.supervisionStrategy = props.supervisionStrategy ?? null;
     this.dispatcher = dispatcher;
     this.throughput = throughput;
@@ -145,7 +158,11 @@ export class ActorCell<T = unknown> implements ActorRef<T>, ActorContext<T> {
   // ActorRef interface — the public-facing handle
   // ========================================================================
 
-  /** Fire-and-forget send. */
+  /**
+   * Fire-and-forget message delivery. The call returns immediately.
+   * If the actor is already stopped the message is routed to the dead-letter channel.
+   * If the mailbox is full (BoundedMailbox) the message is also dead-lettered.
+   */
   tell(message: T, sender: ActorRef<any> | null = null): void {
     if (this.state === ActorState.Stopped) {
       this._system.eventStream.publish<DeadLetter<T>>(DEAD_LETTER_CHANNEL, {
@@ -177,7 +194,13 @@ export class ActorCell<T = unknown> implements ActorRef<T>, ActorContext<T> {
     this.scheduleProcessing();
   }
 
-  /** Request-response; returns a Promise. */
+  /**
+   * Send a message and await a typed reply.
+   * The receiving actor replies by calling `ActorCell.reply(context, value)`.
+   * @param message   Message to deliver.
+   * @param timeoutMs Milliseconds to wait for a reply (default 5 000 ms).
+   * @throws After `timeoutMs` with no reply, the returned Promise rejects.
+   */
   ask<R>(message: T, timeoutMs = 5000): Promise<R> {
     return new Promise<R>((resolve, reject) => {
       const correlationId = ++this.askCounter;
@@ -218,7 +241,10 @@ export class ActorCell<T = unknown> implements ActorRef<T>, ActorContext<T> {
     });
   }
 
-  /** Stop this actor gracefully. */
+  /**
+   * Request graceful termination by sending a PoisonPill message.
+   * The actor processes any messages already in its mailbox before stopping.
+   */
   stop(): void {
     this.tell(PoisonPill as any);
   }
@@ -227,26 +253,36 @@ export class ActorCell<T = unknown> implements ActorRef<T>, ActorContext<T> {
   // ActorContext interface — available inside receive
   // ========================================================================
 
+  /** The ActorRef handle for this actor itself. */
   get self(): ActorRef<T> {
     return this;
   }
 
+  /** The sender of the currently processed message, or `null` outside a receive call. */
   get sender(): ActorRef<any> | null {
     return this.currentSender;
   }
 
+  /** The parent ActorRef, or `null` for top-level actors directly under /user. */
   get parent(): ActorRef<any> | null {
     return this._parent;
   }
 
+  /** @internal The owning ActorSystem (typed as `any` to break the forward-reference cycle). */
   get system(): ActorSystem {
     return this._system;
   }
 
+  /** Read-only snapshot of all live child actors, keyed by their simple names. */
   get children(): ReadonlyMap<string, ActorRef<any>> {
     return this._children;
   }
 
+  /**
+   * Spawn a new child actor with the given props and name.
+   * The child is started immediately and appears in `children`.
+   * @throws If a child with the same name already exists under this actor.
+   */
   spawn<U>(props: Props<U>, name: string): ActorRef<U> {
     if (this._children.has(name)) {
       throw new Error(
@@ -259,6 +295,7 @@ export class ActorCell<T = unknown> implements ActorRef<T>, ActorContext<T> {
     return child;
   }
 
+  /** Gracefully stop a direct child actor. No-op if the child is not known. */
   stopChild(child: ActorRef<any>): void {
     const cell = child as ActorCell<any>;
     if (this._children.has(cell.name)) {
@@ -266,12 +303,16 @@ export class ActorCell<T = unknown> implements ActorRef<T>, ActorContext<T> {
     }
   }
 
-  // Context.stop — overloaded: stop self or stop a child
-  // Supervision window and retry accounting
+  /** Implements `ActorContext.stop(child)` — delegates to `stopChild`. */
   contextStop(child: ActorRef<any>): void {
     this.stopChild(child);
   }
 
+  /**
+   * Register a DeathWatch on `target`.
+   * A `TerminatedMessage` is delivered to this actor when `target` stops.
+   * If `target` is already stopped the message is delivered immediately.
+   */
   watch(target: ActorRef<any>): void {
     const cell = target as ActorCell<any>;
     cell.watchers.add(this);
@@ -282,12 +323,19 @@ export class ActorCell<T = unknown> implements ActorRef<T>, ActorContext<T> {
     }
   }
 
+  /** Remove the DeathWatch on a previously watched actor. */
   unwatch(target: ActorRef<any>): void {
     const cell = target as ActorCell<any>;
     cell.watchers.delete(this);
     this.watching.delete(cell);
   }
 
+  /**
+   * Hot-swap the current receive function.
+   * @param behavior   New receive function to install.
+   * @param discardOld When `true` the current behavior is dropped; when `false`
+   *                   it is pushed onto the stack and can be restored with `unbecome()`.
+   */
   become(behavior: Receive<T>, discardOld = false): void {
     if (!discardOld) {
       this.behaviorStack.push(this.currentBehavior);
@@ -295,6 +343,7 @@ export class ActorCell<T = unknown> implements ActorRef<T>, ActorContext<T> {
     this.currentBehavior = behavior;
   }
 
+  /** Revert to the previous behavior by popping the behavior stack. No-op when the stack is empty. */
   unbecome(): void {
     const prev = this.behaviorStack.pop();
     if (prev) {
@@ -302,6 +351,10 @@ export class ActorCell<T = unknown> implements ActorRef<T>, ActorContext<T> {
     }
   }
 
+  /**
+   * Schedule a single message delivery to self after `delayMs` milliseconds.
+   * @returns A `CancelToken` whose `cancel()` aborts the delivery if not yet fired.
+   */
   scheduleOnce(delayMs: number, message: T): CancelToken {
     const timer = setTimeout(() => {
       this.scheduledTimers.delete(timer);
@@ -316,6 +369,10 @@ export class ActorCell<T = unknown> implements ActorRef<T>, ActorContext<T> {
     };
   }
 
+  /**
+   * Schedule a repeating message delivery to self every `intervalMs` milliseconds.
+   * @returns A `CancelToken` whose `cancel()` stops the interval.
+   */
   scheduleRepeatedly(intervalMs: number, message: T): CancelToken {
     const timer = setInterval(() => {
       this.tell(message);
@@ -329,22 +386,39 @@ export class ActorCell<T = unknown> implements ActorRef<T>, ActorContext<T> {
     };
   }
 
+  /**
+   * Forward the current in-flight message to `target`, preserving the original sender.
+   * No-op when called outside a receive invocation.
+   */
   forward(target: ActorRef<any>): void {
     if (this.currentEnvelope) {
       target.tell(this.currentEnvelope.message, this.currentEnvelope.sender);
     }
   }
 
+  /**
+   * Replace the supervision strategy applied to this actor's children.
+   * The strategy is validated at runtime (Typia) before being stored.
+   */
   setSupervisionStrategy(strategy: SupervisionStrategy): void {
+    assertSupervisionStrategy(strategy);
     this.supervisionStrategy = strategy;
   }
 
+  /**
+   * Stash the current in-flight message for later reprocessing.
+   * No-op when called outside a receive invocation.
+   */
   stash(): void {
     if (this.currentEnvelope) {
       this.stashedMessages.push(this.currentEnvelope);
     }
   }
 
+  /**
+   * Re-enqueue all previously stashed messages at the front of the mailbox
+   * and trigger mailbox processing.
+   */
   unstashAll(): void {
     const stashed = this.stashedMessages;
     this.stashedMessages = [];
@@ -359,6 +433,7 @@ export class ActorCell<T = unknown> implements ActorRef<T>, ActorContext<T> {
   // Lifecycle
   // ========================================================================
 
+  /** @internal Transition to the Started state and deliver the PreStart lifecycle signal. */
   start(): void {
     if (this.state !== ActorState.New) return;
     this.state = ActorState.Started;
@@ -620,7 +695,7 @@ export class ActorCell<T = unknown> implements ActorRef<T>, ActorContext<T> {
     }
   }
 
-  // Expose mailbox size for router
+  /** @internal Current mailbox depth — read by the SmallestMailbox router strategy. */
   get mailboxSize(): number {
     return this.mailbox.size;
   }

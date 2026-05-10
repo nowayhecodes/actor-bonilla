@@ -9,6 +9,7 @@ import type {
   TimeoutOptions,
   Hooks,
   CacheStore,
+  PaginationOptions,
 } from './types.js';
 import {
   DEFAULT_TIMEOUT,
@@ -17,6 +18,11 @@ import {
   defaultRetryDelay,
 } from './defaults.js';
 import { MemoryCache } from './cache.js';
+import {
+  assertRetryOptions,
+  assertTimeoutOptions,
+  assertPaginationOptions,
+} from './validation.js';
 
 // ─── URL helpers ─────────────────────────────────────────────────────────────
 
@@ -60,29 +66,38 @@ export function mergeHeaders(
 // ─── Retry normalization ─────────────────────────────────────────────────────
 
 function normalizeRetry(retry: Options['retry']): RetryOptions {
+  let base: RetryOptions;
   if (retry === undefined || retry === null) {
-    return { ...DEFAULT_RETRY };
+    base = { ...DEFAULT_RETRY };
+  } else if (typeof retry === 'number') {
+    base = { ...DEFAULT_RETRY, limit: retry };
+  } else {
+    base = { ...DEFAULT_RETRY };
+    if (retry.limit !== undefined) base.limit = retry.limit;
+    if (retry.methods) base.methods = retry.methods;
+    if (retry.statusCodes) base.statusCodes = retry.statusCodes;
+    if (retry.errorCodes) base.errorCodes = retry.errorCodes;
+    if (retry.calculateDelay) base.calculateDelay = retry.calculateDelay;
+    if (retry.backoffLimit !== undefined) base.backoffLimit = retry.backoffLimit;
+    if (retry.maxRetryAfter !== undefined) base.maxRetryAfter = retry.maxRetryAfter;
   }
-  if (typeof retry === 'number') {
-    return { ...DEFAULT_RETRY, limit: retry };
-  }
-  const base = { ...DEFAULT_RETRY };
-  if (retry.limit !== undefined) base.limit = retry.limit;
-  if (retry.methods) base.methods = retry.methods;
-  if (retry.statusCodes) base.statusCodes = retry.statusCodes;
-  if (retry.errorCodes) base.errorCodes = retry.errorCodes;
-  if (retry.calculateDelay) base.calculateDelay = retry.calculateDelay;
-  if (retry.backoffLimit !== undefined) base.backoffLimit = retry.backoffLimit;
-  if (retry.maxRetryAfter !== undefined) base.maxRetryAfter = retry.maxRetryAfter;
+  assertRetryOptions(base);
   return base;
 }
 
 // ─── Timeout normalization ────────────────────────────────────────────────────
 
 function normalizeTimeout(timeout: Options['timeout']): TimeoutOptions {
-  if (timeout === undefined) return { ...DEFAULT_TIMEOUT };
-  if (typeof timeout === 'number') return { request: timeout };
-  return { ...DEFAULT_TIMEOUT, ...timeout };
+  let resolved: TimeoutOptions;
+  if (timeout === undefined) {
+    resolved = { ...DEFAULT_TIMEOUT };
+  } else if (typeof timeout === 'number') {
+    resolved = { request: timeout };
+  } else {
+    resolved = { ...DEFAULT_TIMEOUT, ...timeout };
+  }
+  assertTimeoutOptions(resolved);
+  return resolved;
 }
 
 // ─── Hooks normalization ──────────────────────────────────────────────────────
@@ -139,6 +154,20 @@ export function normalizeOptions(
 
   const headers = buildHeaders(merged);
 
+  const maxRedirects = merged.maxRedirects ?? 10;
+  if (maxRedirects < 0) {
+    throw new RangeError(`maxRedirects must be >= 0, got ${maxRedirects}`);
+  }
+
+  const maxConcurrent = merged.maxConcurrent ?? 256;
+  if (maxConcurrent < 1) {
+    throw new RangeError(`maxConcurrent must be >= 1, got ${maxConcurrent}`);
+  }
+
+  if (merged.pagination !== undefined) {
+    assertPaginationOptions(merged.pagination as PaginationOptions<unknown>);
+  }
+
   return {
     url,
     method: (merged.method?.toUpperCase() as NormalizedOptions['method']) ?? 'GET',
@@ -150,7 +179,7 @@ export function normalizeOptions(
     retry,
     hooks: normalizeHooks(merged.hooks),
     followRedirects: merged.followRedirects ?? true,
-    maxRedirects: merged.maxRedirects ?? 10,
+    maxRedirects,
     decompress: merged.decompress ?? true,
     username: merged.username,
     password: merged.password,
@@ -164,7 +193,7 @@ export function normalizeOptions(
     onUploadProgress: merged.onUploadProgress,
     onDownloadProgress: merged.onDownloadProgress,
     pagination: merged.pagination,
-    maxConcurrent: merged.maxConcurrent ?? 256,
+    maxConcurrent,
     proxy: merged.proxy,
     https: merged.https,
   };
