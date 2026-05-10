@@ -1,6 +1,6 @@
 {
   "name": "@actor-bonilla/http",
-  "version": "1.1.0",
+  "version": "1.0.0",
   "description": "HTTP client built on native fetch, composable with Actor Bonilla core",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
