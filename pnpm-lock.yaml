@@ -77,6 +77,10 @@ importers:
         version: 6.0.3
 
   packages/http:
+    dependencies:
+      '@actor-bonilla/core':
+        specifier: workspace:*
+        version: link:../core
     devDependencies:
       '@jest/globals':
         specifier: 30.4.1
@@ -120,6 +124,9 @@ importers:
       typescript:
         specifier: 6.0.3
         version: 6.0.3
+      typia:
+        specifier: 12.1.1
+        version: 12.1.1(@types/node@25.6.2)(typescript@6.0.3)
 
 packages:
 
