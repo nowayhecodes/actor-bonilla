@@ -1,7 +1,7 @@
 // ============================================================================
 // @actor-bonilla/http — HttpClient
 //
-// Full-featured HTTP client on top of Node 20's global fetch (Undici-backed).
+// Full-featured HTTP client built on Node 20's global fetch (Undici-backed).
 // Integration with @actor-bonilla/core:
 //   • ActorSystem's EventStream publishes download/upload progress.
 //   • A shared CacheActor manages RFC-lite response caching as actor state.
@@ -9,6 +9,7 @@
 // ============================================================================
 
 import { ActorSystem, type ActorRef, type EventClassifier } from '@actor-bonilla/core';
+import { MemoryCache } from './cache.js';
 import {
   type Options,
   type NormalizedOptions,
@@ -23,7 +24,7 @@ import {
   HTTP_ERROR_CHANNEL,
   type HttpProgressEvent,
 } from './types.js';
-import { HTTPError, TimeoutError, ParseError, MaxRedirectsError, normalizeError, RequestError } from './errors.js';
+import { HTTPError, TimeoutError, ParseError, normalizeError, RequestError } from './errors.js';
 import { normalizeOptions, mergeOptionObjects } from './normalize.js';
 import {
   buildCacheKey,
@@ -34,7 +35,7 @@ import {
   isStale,
 } from './cache.js';
 import { Semaphore } from './semaphore.js';
-import { defaultRetryDelay, IDEMPOTENT_METHODS } from './defaults.js';
+import { defaultRetryDelay, IDEMPOTENT_METHODS, RETRY_ERROR_CODES } from './defaults.js';
 import { cacheActorProps, type CacheMsg } from './actors/cache.js';
 
 export { HTTP_PROGRESS_CHANNEL, HTTP_REQUEST_CHANNEL, HTTP_RESPONSE_CHANNEL, HTTP_ERROR_CHANNEL };
@@ -138,12 +139,15 @@ async function readBody<T>(
   emit(transferred);
 
   const downloadMs = Date.now() - start;
-  const allBytes = chunks.reduce((acc, c) => {
-    const merged = new Uint8Array(acc.byteLength + c.byteLength);
-    merged.set(acc);
-    merged.set(c, acc.byteLength);
-    return merged;
-  }, new Uint8Array(0));
+
+  // Single pre-allocated copy — O(n) instead of O(n²) reduce
+  const totalSize = chunks.reduce((sum, c) => sum + c.byteLength, 0);
+  const allBytes = new Uint8Array(totalSize);
+  let byteOffset = 0;
+  for (const chunk of chunks) {
+    allBytes.set(chunk, byteOffset);
+    byteOffset += chunk.byteLength;
+  }
 
   switch (options.responseType) {
     case 'buffer': {
@@ -191,15 +195,11 @@ function buildFetchInit(options: NormalizedOptions, signal?: AbortSignal): Reque
   return init;
 }
 
+const NETWORK_ERROR_CODES = new Set(RETRY_ERROR_CODES);
+
 function isNetworkError(err: unknown): boolean {
   const code = (err as NodeJS.ErrnoException)?.code;
-  return (
-    code !== undefined &&
-    [
-      'ETIMEDOUT', 'ECONNRESET', 'EADDRINUSE', 'ECONNREFUSED',
-      'EPIPE', 'ENOTFOUND', 'ENETUNREACH', 'EAI_AGAIN',
-    ].includes(code)
-  );
+  return code !== undefined && NETWORK_ERROR_CODES.has(code);
 }
 
 // ─── HttpClient ───────────────────────────────────────────────────────────────
@@ -270,6 +270,11 @@ export class HttpClient {
     retryCount: number,
     redirectUrls: string[]
   ): Promise<HttpResponse<T>> {
+    // Run init hooks (called once per execute, before beforeRequest)
+    for (const hook of options.hooks.init) {
+      hook(options as unknown as Partial<Options>, options);
+    }
+
     // Run beforeRequest hooks
     let currentOptions = options;
     for (const hook of currentOptions.hooks.beforeRequest) {
@@ -400,10 +405,11 @@ export class HttpClient {
       }
     }
 
-    // Retry on status code
+    // Retry on status code — build Set once per execute call for O(1) lookup
+    const retryStatusSet = new Set(currentOptions.retry.statusCodes);
     if (
       retryCount < currentOptions.retry.limit &&
-      currentOptions.retry.statusCodes.includes(httpResponse.statusCode) &&
+      retryStatusSet.has(httpResponse.statusCode) &&
       IDEMPOTENT_METHODS.has(currentOptions.method)
     ) {
       const retryAfterMs = parseRetryAfter(
@@ -716,13 +722,11 @@ export class HttpClient {
   }
 }
 
-// ─── Module-level factory (Got-style top-level usage) ────────────────────────
+// ─── Module-level default instance ───────────────────────────────────────────
 
 export const http = new HttpClient();
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-import { MemoryCache } from './cache.js';
+// ─── Internal helpers ─────────────────────────────────────────────────────────
 
 function resolveCacheStore(cache: Options['cache']): CacheStore {
   if (!cache) return new MemoryCache();

@@ -1,6 +1,23 @@
 # Changelog
 
-The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+## [Unreleased]
+
+## [1.1.0] — 2026-05-10
+
+### Changed
+
+- **`validation.ts`** — switched from `typia.createAssert` to `typia.createAssertEquals` for all three config validators (`assertActorSystemConfig`, `assertThreadPoolConfig`, `assertThreadedProps`). `assertEquals` rejects objects with unknown extra properties in addition to the existing type-shape checks.
+- **`types.ts`** — added `tags.ExclusiveMinimum<0>` to `SupervisionStrategy.maxRetries` and `withinMs` (both must be strictly positive; zero restarts / zero windows make no sense). Added `tags.Minimum<1>` to `RouterConfig.nrOfInstances` and `tags.MinLength<1>` to `ActorSystemConfig.name` (already present; documented).
+
+### Fixed
+
+- `ActorContext.system` typed as `any` annotated with a `@internal` JSDoc comment to clarify this is intentional (forward-reference cycle) and is never part of the public API surface.
+
+---
+
+
 
 ## [1.0.0] — 2026-05-09
 

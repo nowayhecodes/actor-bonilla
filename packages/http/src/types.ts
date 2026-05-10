@@ -3,6 +3,7 @@
 // ============================================================================
 
 import type { ActorSystem } from '@actor-bonilla/core';
+import type { tags } from 'typia';
 
 export type HttpMethod =
   | 'GET'
@@ -17,16 +18,16 @@ export type HttpMethod =
 // ─── Timeout ────────────────────────────────────────────────────────────────
 
 export interface TimeoutOptions {
-  /** ms until the socket is connected. */
-  connect?: number;
-  /** ms until first byte of the response body arrives. */
-  response?: number;
-  /** ms of inactivity between received bytes. */
-  read?: number;
-  /** ms until the full request body is sent. */
-  send?: number;
+  /** ms until the socket is connected. Must be >= 0. */
+  connect?: number & tags.Minimum<0>;
+  /** ms until first byte of the response body arrives. Must be >= 0. */
+  response?: number & tags.Minimum<0>;
+  /** ms of inactivity between received bytes. Must be >= 0. */
+  read?: number & tags.Minimum<0>;
+  /** ms until the full request body is sent. Must be >= 0. */
+  send?: number & tags.Minimum<0>;
   /** Hard cap on the total request lifecycle (ms). 0 = disabled. */
-  request?: number;
+  request?: number & tags.Minimum<0>;
 }
 
 // ─── Retry ──────────────────────────────────────────────────────────────────
@@ -40,8 +41,8 @@ export interface RetryObject {
 }
 
 export interface RetryOptions {
-  /** Number of retries after the first attempt. Default 2. */
-  limit: number;
+  /** Number of retries after the first attempt. Must be >= 0. Default 2. */
+  limit: number & tags.Minimum<0>;
   /** Eligible HTTP methods. Default: idempotent set. */
   methods: HttpMethod[];
   /** Response status codes that trigger a retry. */
@@ -50,10 +51,10 @@ export interface RetryOptions {
   errorCodes: string[];
   /** Returns delay before the next attempt (ms). */
   calculateDelay: (retryObject: RetryObject) => number;
-  /** Upper cap on calculateDelay result (ms). */
-  backoffLimit: number;
-  /** Max Retry-After header value honoured (ms). Default: unlimited. */
-  maxRetryAfter: number;
+  /** Upper cap on calculateDelay result (ms). Must be >= 0. */
+  backoffLimit: number & tags.Minimum<0>;
+  /** Max Retry-After header value honoured (ms). Must be >= 0. Default: unlimited. */
+  maxRetryAfter: number & tags.Minimum<0>;
 }
 
 // ─── Progress ────────────────────────────────────────────────────────────────
@@ -151,12 +152,12 @@ export interface PaginationOptions<T = unknown> {
   filter?: (item: T, allItems: T[], currentItems: T[]) => boolean;
   /** Return false to stop before countLimit. */
   shouldContinue?: (item: T, allItems: T[], currentItems: T[]) => boolean;
-  /** Stop once this many items have been yielded. */
-  countLimit?: number;
-  /** Delay (ms) between page requests. */
-  backoff?: number;
-  /** Stop after this many HTTP requests. */
-  requestLimit?: number;
+  /** Stop once this many items have been yielded. Must be >= 1. */
+  countLimit?: number & tags.Minimum<1>;
+  /** Delay (ms) between page requests. Must be >= 0. */
+  backoff?: number & tags.Minimum<0>;
+  /** Stop after this many HTTP requests. Must be >= 1. */
+  requestLimit?: number & tags.Minimum<1>;
   /** Accumulate all items in memory (default true). */
   stackAllItems?: boolean;
 }

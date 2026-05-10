@@ -10,13 +10,22 @@ import type {
   ThreadedProps,
 } from './types.js';
 
-/** Validates user-supplied actor system options before construction. */
+/**
+ * Validates user-supplied actor system options before construction.
+ * Uses `assertEquals` to reject objects with unknown extra properties.
+ */
 export const assertActorSystemConfig =
-  typia.createAssert<ActorSystemConfig>();
+  typia.createAssertEquals<ActorSystemConfig>();
 
-/** Validates thread pool options (worker count, script path). */
+/**
+ * Validates thread pool options (worker count, script path).
+ * Uses `assertEquals` to reject objects with unknown extra properties.
+ */
 export const assertThreadPoolConfig =
-  typia.createAssert<ThreadPoolConfig>();
+  typia.createAssertEquals<ThreadPoolConfig>();
 
-/** Validates threaded actor factory references (module path + export name). */
-export const assertThreadedProps = typia.createAssert<ThreadedProps>();
+/**
+ * Validates threaded actor factory references (module path + export name).
+ * Uses `assertEquals` to reject objects with unknown extra properties.
+ */
+export const assertThreadedProps = typia.createAssertEquals<ThreadedProps>();
