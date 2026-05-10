@@ -15,7 +15,9 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md",
+    "docs"
   ],
   "sideEffects": false,
   "repository": {
@@ -25,7 +27,7 @@
   "bugs": {
     "url": "https://github.com/nowayhecodes/actor-bonilla/issues"
   },
-  "homepage": "https://github.com/nowayhecodes/actor-bonilla#readme",
+  "homepage": "https://github.com/nowayhecodes/actor-bonilla/tree/main/docs/README.md",
   "scripts": {
     "prepare": "ts-patch install",
     "run": "tsx src/index.ts",
@@ -34,7 +36,8 @@
     "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --runInBand",
     "test:coverage": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --runInBand --coverage",
     "demo": "tsx examples/demo.ts",
-    "bench": "tsx src/benchmark.ts"
+    "bench": "tsx src/benchmark.ts",
+    "release": "semantic-release"
   },
   "keywords": [
     "actor model",
@@ -49,12 +52,19 @@
   "license": "MIT",
   "devDependencies": {
     "@jest/globals": "30.4.1",
+    "@semantic-release/changelog": "6.0.3",
+    "@semantic-release/commit-analyzer": "13.0.1",
+    "@semantic-release/git": "10.0.1",
+    "@semantic-release/github": "12.0.8",
+    "@semantic-release/npm": "13.1.5",
+    "@semantic-release/release-notes-generator": "14.1.1",
     "@swc/jest": "0.2.39",
     "@types/jest": "30.0.0",
     "@types/node": "25.6.2",
     "cross-env": "10.1.0",
     "jest": "30.4.2",
     "prettier": "3.8.3",
+    "semantic-release": "25.0.3",
     "ts-patch": "4.0.1",
     "tsx": "4.21.0",
     "typescript": "6.0.3"
@@ -66,5 +76,32 @@
   "engines": {
     "node": ">=20"
   },
-  "packageManager": "pnpm@10.5.0"
+  "packageManager": "pnpm@10.5.0",
+  "release": {
+    "branches": [
+      {
+        "name": "main"
+      }
+    ],
+    "repositoryUrl": "https://github.com/nowayhecodes/actor-bonilla",
+    "plugins": [
+      "@semantic-release/commit-analyzer",
+      "@semantic-release/release-notes-generator",
+      "@semantic-release/changelog",
+      [
+        "@semantic-release/npm",
+        {
+          "npmPublish": false
+        }
+      ],
+      [
+        "@semantic-release/git",
+        {
+          "assets": ["CHANGELOG.md", "package.json"],
+          "message": "chore(release): ${nextRelease.version}\n\n${nextRelease.notes}"
+        }
+      ],
+      "@semantic-release/github"
+    ]
+  }
 }
