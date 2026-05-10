@@ -15,7 +15,7 @@
 | Package | Description |
 |--------|-------------|
 | [@actor-bonilla/core](packages/core/README.md) | Mailboxes, supervision, routers, FSM, pub/sub, optional worker-thread actors |
-| [@actor-bonilla/http](packages/http/README.md) | Native `fetch` HTTP client with retries and hooks (Got-style ergonomics) |
+| [@actor-bonilla/http](packages/http/README.md) | Native `fetch` HTTP client with retries and hooks |
 
 ## Contributing
 
