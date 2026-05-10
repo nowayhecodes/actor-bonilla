@@ -53,7 +53,7 @@ jobs:
 
       - name: Semantic release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
           # Uncomment when setting npmPublish to true and adding NPM_TOKEN to repo secrets:
           # NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: pnpm exec semantic-release
