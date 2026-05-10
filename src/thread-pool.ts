@@ -37,6 +37,7 @@ import {
 import { cpus } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import type { ActorRef, CancelToken } from './types.js';
+import { assertThreadPoolConfig, assertThreadedProps } from './validation.js';
 
 // ============================================================================
 // Protocol — messages between main thread and workers
@@ -526,6 +527,7 @@ export class ThreadPool {
     | null = null;
 
   constructor(config: ThreadPoolConfig = {}) {
+    assertThreadPoolConfig(config);
     this.poolSize = config.poolSize ?? Math.max(cpus().length - 1, 1);
     const workerScript = config.workerScript ?? fileURLToPath(import.meta.url);
 
@@ -573,6 +575,7 @@ export class ThreadPool {
     threadedProps: ThreadedProps,
     workerIndex?: number
   ): Promise<ThreadPoolRef<T>> {
+    assertThreadedProps(threadedProps);
     if (!this.alive) throw new Error('ThreadPool is shut down');
 
     const idx = workerIndex ?? this.pickWorker();

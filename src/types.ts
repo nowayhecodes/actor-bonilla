@@ -209,6 +209,21 @@ export interface RouterConfig {
 }
 
 // ============================================================================
+// Actor system configuration
+// ============================================================================
+
+export interface ActorSystemConfig {
+  /** Name of the actor system. */
+  name?: string;
+  /** Default dispatcher throughput (messages per batch). */
+  defaultThroughput?: number;
+  /** Enable dead letter logging. */
+  logDeadLetters?: boolean;
+  /** Maximum dead letters to log before silencing. */
+  maxDeadLettersLogged?: number;
+}
+
+// ============================================================================
 // Ask pattern types
 // ============================================================================
 

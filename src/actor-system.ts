@@ -3,8 +3,14 @@
 // The top-level container for all actors.
 // ============================================================================
 
-import type { ActorRef, Props, DeadLetter } from './types.js';
+import type {
+  ActorRef,
+  Props,
+  DeadLetter,
+  ActorSystemConfig,
+} from './types.js';
 import { DispatcherType } from './types.js';
+import { assertActorSystemConfig } from './validation.js';
 import { ActorCell } from './actor-cell.js';
 import {
   DefaultDispatcher,
@@ -13,17 +19,6 @@ import {
   type Dispatcher,
 } from './dispatcher.js';
 import { EventStream, DEAD_LETTER_CHANNEL } from './event-stream.js';
-
-export interface ActorSystemConfig {
-  /** Name of the actor system. */
-  name?: string;
-  /** Default dispatcher throughput (messages per batch). */
-  defaultThroughput?: number;
-  /** Enable dead letter logging. */
-  logDeadLetters?: boolean;
-  /** Maximum dead letters to log before silencing. */
-  maxDeadLettersLogged?: number;
-}
 
 /**
  * ActorSystem is the root of the actor hierarchy.
@@ -58,6 +53,7 @@ export class ActorSystem {
   private _isTerminated = false;
 
   constructor(config: ActorSystemConfig = {}) {
+    assertActorSystemConfig(config);
     this.config = {
       name: config.name ?? 'actor-bonilla-system',
       defaultThroughput: config.defaultThroughput ?? 32,

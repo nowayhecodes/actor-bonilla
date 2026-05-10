@@ -14,6 +14,7 @@ export {
   type TerminatedMessage,
   type DeadLetter,
   type RouterConfig,
+  type ActorSystemConfig,
   type AskReplyMessage,
   type EventClassifier,
   type EventSubscriber,
@@ -37,7 +38,14 @@ export {
 } from './types.js';
 
 // Actor System
-export { ActorSystem, type ActorSystemConfig } from './actor-system.js';
+export { ActorSystem } from './actor-system.js';
+
+// Runtime validation (Typia)
+export {
+  assertActorSystemConfig,
+  assertThreadPoolConfig,
+  assertThreadedProps,
+} from './validation.js';
 
 // Actor Cell (reply helper)
 export { ActorCell } from './actor-cell.js';

@@ -6,8 +6,8 @@
 // communicate transparently.
 // ============================================================================
 
-import type { ActorRef, Props } from './types.js';
-import { ActorSystem, type ActorSystemConfig } from './actor-system.js';
+import type { ActorRef, Props, ActorSystemConfig } from './types.js';
+import { ActorSystem } from './actor-system.js';
 import {
   ThreadPool,
   ThreadPoolRef,

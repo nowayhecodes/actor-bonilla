@@ -9,7 +9,9 @@
     "esModuleInterop": true,
     "declaration": true,
     "sourceMap": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "types": ["node"],
+    "plugins": [{ "transform": "typia/lib/transform" }]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "test", "examples"]
