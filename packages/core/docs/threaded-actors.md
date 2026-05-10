@@ -5,7 +5,7 @@ CPU-heavy work can run on **`worker_threads`** instead of the main event loop.
 Functions cannot be serialized across threads. Behaviors are loaded by **absolute module path** + **exported factory name** + **serializable factory arguments** (similar to passing a class name and ctor args in other actor systems).
 
 ```typescript
-import { ThreadedActorSystem } from 'actor-bonilla';
+import { ThreadedActorSystem } from '@actor-bonilla/core';
 
 const system = new ThreadedActorSystem({});
 

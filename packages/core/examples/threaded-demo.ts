@@ -27,7 +27,7 @@ if (!isMainThread) {
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = dirname(__filename);
   const behaviorsModule = resolve(__dirname, 'behaviors', 'examples.ts');
-  const threadPoolModule = resolve(__dirname, 'thread-pool.ts');
+  const threadPoolModule = resolve(__dirname, '../src/thread-pool.ts');
 
   function formatNum(n: number): string {
     return n.toLocaleString('en-US');

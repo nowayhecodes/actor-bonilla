@@ -4,62 +4,28 @@
 
 # Actor Bonilla
 
-**Actor-system runtime for Node.js and TypeScript (ESM)** — mailboxes, supervision, routers, FSM helpers, pub/sub, and optional **worker-thread** actors.
+**Monorepo** — [`@actor-bonilla/core`](packages/core/README.md) (actor-system runtime). **`@actor-bonilla/http`** is added under [`packages/http`](packages/http/) when published.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 </div>
 
-## Installation
+## Packages
+
+| Package | Description |
+|--------|-------------|
+| [@actor-bonilla/core](packages/core/README.md) | Mailboxes, supervision, routers, FSM, pub/sub, optional worker-thread actors |
+
+## Contributing
+
+Clone the repo, install with **pnpm** at the repository root (`pnpm install`), then build and test:
 
 ```bash
-pnpm add actor-bonilla
-# or
-npm install actor-bonilla
+pnpm run build
+pnpm run test
 ```
 
-Requires **Node.js 20+**. The package is **ESM-only**.
-
-## Quick start
-
-```typescript
-import { ActorSystem, props, PoisonPill } from 'actor-bonilla';
-
-const system = new ActorSystem({ name: 'demo', logDeadLetters: false });
-
-const greeter = system.actorOf<string>(
-  props((msg) => {
-    console.log(`hello ${msg}`);
-  }),
-  'greeter'
-);
-
-greeter.tell('world');
-greeter.tell(PoisonPill);
-
-await system.terminate();
-```
-
-## Documentation
-
-Guides for library users and contributors live in **[`docs/`](https://github.com/nowayhecodes/actor-bonilla/tree/main/docs)**:
-
-| | |
-|--|--|
-| [Getting started](https://github.com/nowayhecodes/actor-bonilla/blob/main/docs/getting-started.md) | Install, ESM, first actor |
-| [Features](https://github.com/nowayhecodes/actor-bonilla/blob/main/docs/features.md) | Mailboxes, dispatchers, supervision, router, FSM, events |
-| [Runtime validation](https://github.com/nowayhecodes/actor-bonilla/blob/main/docs/runtime-validation.md) | Typia config asserts |
-| [Threaded actors](https://github.com/nowayhecodes/actor-bonilla/blob/main/docs/threaded-actors.md) | `worker_threads` pool |
-| [API reference](https://github.com/nowayhecodes/actor-bonilla/blob/main/docs/api-reference.md) | Main exports |
-| [Examples](https://github.com/nowayhecodes/actor-bonilla/blob/main/docs/examples.md) | Repo demos |
-| [Developing](https://github.com/nowayhecodes/actor-bonilla/blob/main/docs/developing.md) | Build, test, release (clone only) |
-
-After install, open `node_modules/actor-bonilla/docs/` for the same files offline.
-
-## Links
-
-- [Issues](https://github.com/nowayhecodes/actor-bonilla/issues)
-- [Changelog](https://github.com/nowayhecodes/actor-bonilla/blob/main/CHANGELOG.md)
+See [Developing](packages/core/docs/developing.md) for details.
 
 ## License
 

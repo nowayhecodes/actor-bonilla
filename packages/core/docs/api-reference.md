@@ -1,6 +1,6 @@
 # API reference
 
-Everything below is imported from **`actor-bonilla`** (single export surface).
+Everything below is imported from **`@actor-bonilla/core`** (single export surface).
 
 ## Core types & factories
 

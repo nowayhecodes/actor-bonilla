@@ -1,6 +1,6 @@
 # Documentation
 
-Library guides for **actor-bonilla** — a typed actor-system runtime for Node.js (ESM).
+Library guides for **`@actor-bonilla/core`** — a typed actor-system runtime for Node.js (ESM).
 
 | Guide | Contents |
 |-------|----------|

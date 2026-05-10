@@ -8,9 +8,9 @@
 ## Install
 
 ```bash
-pnpm add actor-bonilla
+pnpm add @actor-bonilla/core
 # or
-npm install actor-bonilla
+npm install @actor-bonilla/core
 ```
 
 TypeScript users get types via `"types"` / `exports` from the published package.
@@ -18,7 +18,7 @@ TypeScript users get types via `"types"` / `exports` from the published package.
 ## Minimal example
 
 ```typescript
-import { ActorSystem, props, PoisonPill } from 'actor-bonilla';
+import { ActorSystem, props, PoisonPill } from '@actor-bonilla/core';
 
 const system = new ActorSystem({ name: 'demo', logDeadLetters: false });
 

@@ -8,6 +8,6 @@ Configuration objects can be validated at runtime using **[Typia](https://typia.
 | `assertThreadPoolConfig` | Worker pool size and optional worker script path |
 | `assertThreadedProps` | `behaviorModule`, `behaviorExport`, `behaviorArgs` for threaded actors |
 
-Import from **`actor-bonilla`** when merging JSON configs or other untrusted input before constructing the system.
+Import from **`@actor-bonilla/core`** when merging JSON configs or other untrusted input before constructing the system.
 
 If your toolchain does not run Typia’s compiler plugin, use manual guards instead of these asserts.

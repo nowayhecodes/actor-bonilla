@@ -51,9 +51,10 @@ jobs:
       - name: Test
         run: pnpm run test
 
-      - name: Semantic release
+      - name: Semantic release (@actor-bonilla/core)
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
           # Uncomment when setting npmPublish to true and adding NPM_TOKEN to repo secrets:
           # NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        working-directory: packages/core
         run: pnpm exec semantic-release

@@ -1,6 +1,6 @@
 # Examples
 
-All examples assume you run them from the **repository root** after `pnpm install`.
+After `pnpm install` at the **repository root**, run demos via workspace scripts (or `pnpm exec tsx` from `packages/core`).
 
 | File | Description |
 |------|-------------|
@@ -11,8 +11,8 @@ All examples assume you run them from the **repository root** after `pnpm instal
 ### Commands
 
 ```bash
-pnpm exec tsx examples/demo.ts
-pnpm exec tsx examples/threaded-demo.ts
+pnpm run demo
+pnpm --filter @actor-bonilla/core exec tsx examples/threaded-demo.ts
 ```
 
 ### Threaded actors and module paths
