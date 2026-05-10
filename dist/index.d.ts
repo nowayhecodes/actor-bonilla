@@ -7,3 +7,5 @@ export { DefaultDispatcher, PinnedDispatcher, CallingThreadDispatcher, type Disp
 export { EventStream, DEAD_LETTER_CHANNEL, LOG_CHANNEL, LIFECYCLE_CHANNEL, } from './event-stream.js';
 export { Router } from './router.js';
 export { FSM, type FSMContext, type StateHandler, type StateResult, type TransitionHandler, } from './fsm.js';
+export { ThreadedActorSystem, type ThreadedActorSystemConfig, } from './threaded-actor-system.js';
+export { ThreadPool, ThreadPoolRef, WorkerMsgType, type ThreadPoolConfig, type ThreadedProps, type ThreadedReceive, type ThreadedActorContext, type MainToWorkerMsg, type WorkerToMainMsg, } from './thread-pool.js';

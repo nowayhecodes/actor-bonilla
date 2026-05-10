@@ -2,16 +2,38 @@
   "name": "actor-bonilla",
   "version": "1.0.0",
   "description": "High-performance actor system for TypeScript",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nowayhecodes/actor-bonilla.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nowayhecodes/actor-bonilla/issues"
+  },
+  "homepage": "https://github.com/nowayhecodes/actor-bonilla#readme",
   "scripts": {
     "prepare": "ts-patch install",
     "run": "tsx src/index.ts",
     "build": "tsc",
     "prettier": "prettier --write src/**/*.ts",
     "test": "jest",
-    "demo": "tsx src/demo.ts",
+    "test:coverage": "jest --coverage",
+    "demo": "tsx examples/demo.ts",
     "bench": "tsx src/benchmark.ts"
   },
   "keywords": [
@@ -42,8 +64,7 @@
     "typia": "^12.1.1"
   },
   "engines": {
-    "node": "24.x",
-    "bun": "1.x"
+    "node": ">=20"
   },
   "packageManager": "pnpm@10.5.0"
 }

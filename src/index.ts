@@ -86,3 +86,20 @@ export {
   type StateResult,
   type TransitionHandler,
 } from './fsm.js';
+
+// Worker-thread actor pool (optional)
+export {
+  ThreadedActorSystem,
+  type ThreadedActorSystemConfig,
+} from './threaded-actor-system.js';
+export {
+  ThreadPool,
+  ThreadPoolRef,
+  WorkerMsgType,
+  type ThreadPoolConfig,
+  type ThreadedProps,
+  type ThreadedReceive,
+  type ThreadedActorContext,
+  type MainToWorkerMsg,
+  type WorkerToMainMsg,
+} from './thread-pool.js';

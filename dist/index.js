@@ -21,4 +21,7 @@ export { EventStream, DEAD_LETTER_CHANNEL, LOG_CHANNEL, LIFECYCLE_CHANNEL, } fro
 export { Router } from './router.js';
 // FSM
 export { FSM, } from './fsm.js';
+// Worker-thread actor pool (optional)
+export { ThreadedActorSystem, } from './threaded-actor-system.js';
+export { ThreadPool, ThreadPoolRef, } from './thread-pool.js';
 //# sourceMappingURL=index.js.map
