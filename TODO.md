@@ -8,4 +8,4 @@
 
 4. **Done** — npm-oriented `package.json` (`exports`, `files`, repo URLs), README + `examples/README.md`, public exports for threaded APIs.
 
-5. **Done** — Jest + ts-jest (ESM), Typia validation stub via `moduleNameMapper`, coverage thresholds on instrumented sources (worker-thread modules and Typia-generated validators excluded from coverage collection). Full statement coverage is not practical for `actor-cell` without many more scenarios; adjustable in `jest.config.cjs`.
+5. **Done** — Jest + `@swc/jest` (ESM), Typia validation stub via `moduleNameMapper`, coverage thresholds on instrumented sources (worker-thread modules and Typia-generated validators excluded from coverage collection). Full statement coverage is not practical for `actor-cell` without many more scenarios; adjustable in `jest.config.cjs`.

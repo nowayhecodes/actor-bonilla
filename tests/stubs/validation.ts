@@ -1,5 +1,5 @@
 /**
- * Test stub: Typia transforms only run under `tsc`; ts-jest transpilation skips them.
+ * Test stub: Typia transforms only run under `tsc`; Jest’s SWC transform skips them.
  * This module mirrors the public API of `src/validation.ts` as no-ops so tests
  * exercise the rest of the runtime without failing at import time.
  */

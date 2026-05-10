@@ -1,6 +1,5 @@
 /** @type {import('jest').Config} */
 module.exports = {
-  preset: 'ts-jest/presets/default-esm',
   maxWorkers: 1,
   testTimeout: 30_000,
   testEnvironment: 'node',
@@ -13,13 +12,7 @@ module.exports = {
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
   transform: {
-    '^.+\\.tsx?$': [
-      'ts-jest',
-      {
-        useESM: true,
-        tsconfig: '<rootDir>/tsconfig.spec.json',
-      },
-    ],
+    '^.+\\.(t|j)sx?$': '@swc/jest',
   },
   collectCoverage: true,
   coverageDirectory: 'coverage',

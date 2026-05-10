@@ -93,7 +93,7 @@ The root export (`actor-bonilla`) includes:
 | Script | Command |
 |--------|---------|
 | Build | `pnpm run build` (`tsc`, Typia transforms enabled) |
-| Tests | `pnpm run test` (ESM + ts-jest; uses a stub for `validation.ts` because Jest does not run Typia’s compiler plugin) |
+| Tests | `pnpm run test` (ESM + `@swc/jest`; stub for `validation.ts` because Jest does not run Typia’s compiler plugin) |
 | Coverage | `pnpm run test:coverage` |
 | Bench | `pnpm run bench` |
 | Demo | `pnpm run demo` |

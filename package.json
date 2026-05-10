@@ -48,21 +48,20 @@
   "author": "Gustavo Cavalcante <nowayhecodes@gmail.com>",
   "license": "MIT",
   "devDependencies": {
-    "@jest/globals": "^30.4.1",
+    "@jest/globals": "30.4.1",
     "@swc/jest": "0.2.39",
     "@types/jest": "30.0.0",
     "@types/node": "25.6.2",
-    "cross-env": "^10.1.0",
+    "cross-env": "10.1.0",
     "jest": "30.4.2",
     "prettier": "3.8.3",
-    "ts-jest": "^29.4.9",
-    "ts-patch": "^4.0.1",
+    "ts-patch": "4.0.1",
     "tsx": "4.21.0",
     "typescript": "6.0.3"
   },
   "dependencies": {
     "@swc/core": "1.15.33",
-    "typia": "^12.1.1"
+    "typia": "12.1.1"
   },
   "engines": {
     "node": ">=20"
