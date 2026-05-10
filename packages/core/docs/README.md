@@ -8,6 +8,7 @@ Library guides for **`@actor-bonilla/core`** — a typed actor-system runtime fo
 | [Features](./features.md) | Mailboxes, dispatchers, supervision, router, FSM, event stream |
 | [Runtime validation](./runtime-validation.md) | Typia-backed config asserts |
 | [Threaded actors](./threaded-actors.md) | `worker_threads`, behavior factories, `ThreadedActorSystem` |
+| [HTTP client](./http-client.md) | `@actor-bonilla/http` — fetch, retries, hooks |
 | [API reference](./api-reference.md) | Main exports from the package root |
 | [Examples](./examples.md) | Runnable demos in the repo |
 | [Developing](./developing.md) | Clone the repo: build, test, benchmarks, releases |

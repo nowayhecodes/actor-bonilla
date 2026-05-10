@@ -4,7 +4,7 @@
 
 # Actor Bonilla
 
-**Monorepo** — [`@actor-bonilla/core`](packages/core/README.md) (actor-system runtime). **`@actor-bonilla/http`** is added under [`packages/http`](packages/http/) when published.
+**Monorepo** — [`@actor-bonilla/core`](packages/core/README.md) and [`@actor-bonilla/http`](packages/http/README.md).
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -15,6 +15,7 @@
 | Package | Description |
 |--------|-------------|
 | [@actor-bonilla/core](packages/core/README.md) | Mailboxes, supervision, routers, FSM, pub/sub, optional worker-thread actors |
+| [@actor-bonilla/http](packages/http/README.md) | Native `fetch` HTTP client with retries and hooks (Got-style ergonomics) |
 
 ## Contributing
 

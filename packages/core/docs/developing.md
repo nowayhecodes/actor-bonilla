@@ -18,7 +18,7 @@ Run commands from the **repository root** unless you are working inside a single
 
 ## Release workflow
 
-The GitHub Action **[`.github/workflows/release.yml`](../../../.github/workflows/release.yml)** is triggered **manually** (workflow dispatch). It installs, builds, tests, then runs `semantic-release` in **`packages/core`** (version bump, `CHANGELOG.md`, tag, GitHub Release). npm publish is off while `@semantic-release/npm` has `npmPublish: false`.
+The GitHub Action **[`.github/workflows/release.yml`](../../../.github/workflows/release.yml)** is triggered **manually** (workflow dispatch). It installs, builds, tests, then runs **`semantic-release` for each package** in the matrix (`packages/core`, `packages/http`). Tags use scoped formats (`@actor-bonilla/core@…`, `@actor-bonilla/http@…`) so releases do not collide. npm publish is off while `@semantic-release/npm` has `npmPublish: false`.
 
 ## Commits
 

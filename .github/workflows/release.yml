@@ -13,14 +13,17 @@ permissions:
   issues: write
   pull-requests: write
 
-concurrency:
-  group: release-${{ github.ref }}
-  cancel-in-progress: false
-
 jobs:
   release:
-    name: Build, test, and release
+    name: Build, test, and release (${{ matrix.package }})
     runs-on: ubuntu-latest
+    concurrency:
+      group: release-${{ github.ref }}-${{ matrix.package }}
+      cancel-in-progress: false
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [core, http]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -51,10 +54,10 @@ jobs:
       - name: Test
         run: pnpm run test
 
-      - name: Semantic release (@actor-bonilla/core)
+      - name: Semantic release (${{ matrix.package }})
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
           # Uncomment when setting npmPublish to true and adding NPM_TOKEN to repo secrets:
           # NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        working-directory: packages/core
+        working-directory: packages/${{ matrix.package }}
         run: pnpm exec semantic-release

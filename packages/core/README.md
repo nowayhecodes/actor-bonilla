@@ -50,6 +50,7 @@ Guides for library users and contributors live in **[`docs/`](https://github.com
 | [Features](https://github.com/nowayhecodes/actor-bonilla/blob/main/packages/core/docs/features.md) | Mailboxes, dispatchers, supervision, router, FSM, events |
 | [Runtime validation](https://github.com/nowayhecodes/actor-bonilla/blob/main/packages/core/docs/runtime-validation.md) | Typia config asserts |
 | [Threaded actors](https://github.com/nowayhecodes/actor-bonilla/blob/main/packages/core/docs/threaded-actors.md) | `worker_threads` pool |
+| [HTTP client](https://github.com/nowayhecodes/actor-bonilla/blob/main/packages/core/docs/http-client.md) | `@actor-bonilla/http` fetch client |
 | [API reference](https://github.com/nowayhecodes/actor-bonilla/blob/main/packages/core/docs/api-reference.md) | Main exports |
 | [Examples](https://github.com/nowayhecodes/actor-bonilla/blob/main/packages/core/docs/examples.md) | Repo demos |
 | [Developing](https://github.com/nowayhecodes/actor-bonilla/blob/main/packages/core/docs/developing.md) | Build, test, release (clone only) |
