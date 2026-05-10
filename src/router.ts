@@ -109,8 +109,11 @@ export class Router<T = unknown> {
     // Simple consistent hashing — use message's hashKey if available,
     // otherwise hash the stringified message
     const key =
-      typeof message === 'object' && message !== null && 'hashKey' in message
-        ? String((message as any).hashKey)
+      typeof message === 'object' &&
+      message !== null &&
+      'hashKey' in message &&
+      typeof (message as { hashKey: unknown }).hashKey !== 'undefined'
+        ? String((message as { hashKey: unknown }).hashKey)
         : String(message);
 
     const hash = fnv1a(key);

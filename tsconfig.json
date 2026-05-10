@@ -10,6 +10,8 @@
     "declaration": true,
     "sourceMap": true,
     "skipLibCheck": true,
+    "moduleDetection": "force",
+    "resolveJsonModule": true,
     "types": ["node"],
     "plugins": [{ "transform": "typia/lib/transform" }]
   },

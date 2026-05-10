@@ -89,7 +89,10 @@ export class Router {
     consistentHash(message, sender) {
         // Simple consistent hashing — use message's hashKey if available,
         // otherwise hash the stringified message
-        const key = typeof message === 'object' && message !== null && 'hashKey' in message
+        const key = typeof message === 'object' &&
+            message !== null &&
+            'hashKey' in message &&
+            typeof message.hashKey !== 'undefined'
             ? String(message.hashKey)
             : String(message);
         const hash = fnv1a(key);

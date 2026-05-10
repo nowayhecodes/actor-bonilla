@@ -538,7 +538,7 @@ export class ThreadPool {
       worker.on('message', (msg: WorkerToMainMsg) =>
         this.handleWorkerMessage(i, msg)
       );
-      worker.on('error', (err) => {
+      worker.on('error', (err: unknown) => {
         console.error(`[actor-bonilla/ThreadPool] Worker ${i} error:`, err);
       });
       this.workers.push(worker);
