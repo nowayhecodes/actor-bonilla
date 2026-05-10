@@ -3,6 +3,14 @@ import { UnboundedMailbox, BoundedMailbox, PriorityMailbox, } from './mailbox.js
 import { DEAD_LETTER_CHANNEL, LIFECYCLE_CHANNEL } from './event-stream.js';
 // Global monotonic message ID counter for ordering
 let globalMessageId = 0;
+/** Actor lifecycle states */
+var ActorState;
+(function (ActorState) {
+    ActorState[ActorState["New"] = 0] = "New";
+    ActorState[ActorState["Started"] = 1] = "Started";
+    ActorState[ActorState["Suspended"] = 2] = "Suspended";
+    ActorState[ActorState["Stopped"] = 3] = "Stopped";
+})(ActorState || (ActorState = {}));
 /**
  * ActorCell is the internal implementation behind every ActorRef.
  * It is never exposed to user code — only the ActorRef facade is visible.
@@ -12,7 +20,7 @@ export class ActorCell {
     path;
     name;
     // Internal state
-    state = 0 /* ActorState.New */;
+    state = ActorState.New;
     currentBehavior;
     behaviorStack = [];
     props;
@@ -69,7 +77,7 @@ export class ActorCell {
     // ========================================================================
     /** Fire-and-forget send. */
     tell(message, sender = null) {
-        if (this.state === 3 /* ActorState.Stopped */) {
+        if (this.state === ActorState.Stopped) {
             this._system.eventStream.publish(DEAD_LETTER_CHANNEL, {
                 message,
                 sender,
@@ -175,7 +183,7 @@ export class ActorCell {
         cell.watchers.add(this);
         this.watching.add(cell);
         // If already stopped, send Terminated immediately
-        if (cell.state === 3 /* ActorState.Stopped */) {
+        if (cell.state === ActorState.Stopped) {
             this.tell({ signal: Terminated, ref: target });
         }
     }
@@ -247,9 +255,9 @@ export class ActorCell {
     // Lifecycle
     // ========================================================================
     start() {
-        if (this.state !== 0 /* ActorState.New */)
+        if (this.state !== ActorState.New)
             return;
-        this.state = 1 /* ActorState.Started */;
+        this.state = ActorState.Started;
         // Deliver PreStart
         this.invokeLifecycleHook(PreStart);
     }
@@ -262,13 +270,13 @@ export class ActorCell {
         }
     }
     async terminateGracefully() {
-        if (this.state === 3 /* ActorState.Stopped */)
+        if (this.state === ActorState.Stopped)
             return;
         // Stop all children first
         for (const [, child] of this._children) {
             await child.terminateGracefully();
         }
-        this.state = 3 /* ActorState.Stopped */;
+        this.state = ActorState.Stopped;
         // Invoke PostStop
         await this.invokeLifecycleHook(PostStop);
         // Clear timers
@@ -319,14 +327,14 @@ export class ActorCell {
     // ========================================================================
     scheduleProcessing() {
         if (this.processing ||
-            this.state === 3 /* ActorState.Stopped */ ||
-            this.state === 2 /* ActorState.Suspended */)
+            this.state === ActorState.Stopped ||
+            this.state === ActorState.Suspended)
             return;
         this.processing = true;
         this.dispatcher.dispatch(() => this.processMailbox());
     }
     processMailbox() {
-        if (this.state === 3 /* ActorState.Stopped */) {
+        if (this.state === ActorState.Stopped) {
             this.processing = false;
             return;
         }
@@ -367,7 +375,7 @@ export class ActorCell {
         }
         this.processing = false;
         // If there are more messages, re-schedule
-        if (!this.mailbox.isEmpty && this.state === 1 /* ActorState.Started */) {
+        if (!this.mailbox.isEmpty && this.state === ActorState.Started) {
             this.scheduleProcessing();
         }
     }
@@ -439,12 +447,12 @@ export class ActorCell {
         this.behaviorStack.length = 0;
         // Clear stash
         this.stashedMessages.length = 0;
-        this.state = 1 /* ActorState.Started */;
+        this.state = ActorState.Started;
         await this.invokeLifecycleHook(PostRestart);
     }
     resume() {
-        if (this.state === 2 /* ActorState.Suspended */) {
-            this.state = 1 /* ActorState.Started */;
+        if (this.state === ActorState.Suspended) {
+            this.state = ActorState.Started;
             this.scheduleProcessing();
         }
     }

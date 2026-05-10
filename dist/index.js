@@ -23,5 +23,5 @@ export { Router } from './router.js';
 export { FSM, } from './fsm.js';
 // Worker-thread actor pool (optional)
 export { ThreadedActorSystem, } from './threaded-actor-system.js';
-export { ThreadPool, ThreadPoolRef, } from './thread-pool.js';
+export { ThreadPool, ThreadPoolRef, WorkerMsgType, } from './thread-pool.js';
 //# sourceMappingURL=index.js.map

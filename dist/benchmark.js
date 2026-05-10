@@ -2,6 +2,8 @@
 // actor-bonilla — Benchmark
 // Measures raw message throughput, latency, and actor creation speed.
 // ============================================================================
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { ActorSystem, props } from './index.js';
 function formatNum(n) {
     return n.toLocaleString('en-US');
@@ -187,5 +189,13 @@ async function main() {
     await benchChain(50, 10_000);
     console.log('\n✅ All benchmarks complete.\n');
 }
-main().catch(console.error);
+function isMainBenchmark() {
+    const entry = process.argv[1];
+    if (!entry)
+        return false;
+    return (path.resolve(entry) === path.resolve(fileURLToPath(import.meta.url)));
+}
+if (isMainBenchmark()) {
+    main().catch(console.error);
+}
 //# sourceMappingURL=benchmark.js.map

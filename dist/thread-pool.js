@@ -31,6 +31,26 @@ import { cpus } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { assertThreadPoolConfig, assertThreadedProps } from './validation.js';
 // ============================================================================
+// Protocol — messages between main thread and workers
+// ============================================================================
+export var WorkerMsgType;
+(function (WorkerMsgType) {
+    // Main → Worker
+    WorkerMsgType[WorkerMsgType["CreateActor"] = 1] = "CreateActor";
+    WorkerMsgType[WorkerMsgType["Tell"] = 2] = "Tell";
+    WorkerMsgType[WorkerMsgType["StopActor"] = 3] = "StopActor";
+    WorkerMsgType[WorkerMsgType["Shutdown"] = 4] = "Shutdown";
+    WorkerMsgType[WorkerMsgType["Ask"] = 5] = "Ask";
+    // Worker → Main
+    WorkerMsgType[WorkerMsgType["ActorCreated"] = 10] = "ActorCreated";
+    WorkerMsgType[WorkerMsgType["DeadLetter"] = 11] = "DeadLetter";
+    WorkerMsgType[WorkerMsgType["TellProxy"] = 12] = "TellProxy";
+    WorkerMsgType[WorkerMsgType["AskReply"] = 13] = "AskReply";
+    WorkerMsgType[WorkerMsgType["ActorStopped"] = 14] = "ActorStopped";
+    WorkerMsgType[WorkerMsgType["Log"] = 15] = "Log";
+    WorkerMsgType[WorkerMsgType["Error"] = 16] = "Error";
+})(WorkerMsgType || (WorkerMsgType = {}));
+// ============================================================================
 // WorkerShard — runs inside a worker thread
 // ============================================================================
 /**
@@ -48,19 +68,19 @@ class WorkerShard {
     }
     async handleMessage(msg) {
         switch (msg.type) {
-            case 1 /* WorkerMsgType.CreateActor */:
+            case WorkerMsgType.CreateActor:
                 await this.createActor(msg);
                 break;
-            case 2 /* WorkerMsgType.Tell */:
+            case WorkerMsgType.Tell:
                 this.deliverTell(msg);
                 break;
-            case 5 /* WorkerMsgType.Ask */:
+            case WorkerMsgType.Ask:
                 this.deliverAsk(msg);
                 break;
-            case 3 /* WorkerMsgType.StopActor */:
+            case WorkerMsgType.StopActor:
                 this.stopActor(msg.actorPath);
                 break;
-            case 4 /* WorkerMsgType.Shutdown */:
+            case WorkerMsgType.Shutdown:
                 this.shutdown();
                 break;
         }
@@ -81,13 +101,13 @@ class WorkerShard {
                 processing: false,
             });
             this.port.postMessage({
-                type: 10 /* WorkerMsgType.ActorCreated */,
+                type: WorkerMsgType.ActorCreated,
                 actorPath: msg.actorPath,
             });
         }
         catch (e) {
             this.port.postMessage({
-                type: 16 /* WorkerMsgType.Error */,
+                type: WorkerMsgType.Error,
                 actorPath: msg.actorPath,
                 error: e.message ?? String(e),
             });
@@ -110,7 +130,7 @@ class WorkerShard {
         const actor = this.actors.get(msg.targetPath);
         if (!actor) {
             this.port.postMessage({
-                type: 13 /* WorkerMsgType.AskReply */,
+                type: WorkerMsgType.AskReply,
                 correlationId: msg.correlationId,
                 value: null,
                 error: `Actor ${msg.targetPath} not found`,
@@ -145,7 +165,7 @@ class WorkerShard {
                 senderPath: envelope.senderPath,
                 tell: (targetPath, message) => {
                     this.port.postMessage({
-                        type: 12 /* WorkerMsgType.TellProxy */,
+                        type: WorkerMsgType.TellProxy,
                         targetPath,
                         message,
                         senderPath: path,
@@ -154,7 +174,7 @@ class WorkerShard {
                 reply: (value) => {
                     if (envelope.correlationId !== null) {
                         this.port.postMessage({
-                            type: 13 /* WorkerMsgType.AskReply */,
+                            type: WorkerMsgType.AskReply,
                             correlationId: envelope.correlationId,
                             value,
                         });
@@ -162,7 +182,7 @@ class WorkerShard {
                     else if (envelope.senderPath) {
                         // Reply via tell
                         this.port.postMessage({
-                            type: 12 /* WorkerMsgType.TellProxy */,
+                            type: WorkerMsgType.TellProxy,
                             targetPath: envelope.senderPath,
                             message: value,
                             senderPath: path,
@@ -178,7 +198,7 @@ class WorkerShard {
             }
             catch (e) {
                 this.port.postMessage({
-                    type: 16 /* WorkerMsgType.Error */,
+                    type: WorkerMsgType.Error,
                     actorPath: path,
                     error: e.message ?? String(e),
                 });
@@ -198,7 +218,7 @@ class WorkerShard {
     stopActor(path) {
         this.actors.delete(path);
         this.port.postMessage({
-            type: 14 /* WorkerMsgType.ActorStopped */,
+            type: WorkerMsgType.ActorStopped,
             actorPath: path,
         });
     }
@@ -304,7 +324,7 @@ export class ThreadPool {
                 reject,
             });
             this.workers[idx].postMessage({
-                type: 1 /* WorkerMsgType.CreateActor */,
+                type: WorkerMsgType.CreateActor,
                 actorPath,
                 actorName: name,
                 behaviorModule: threadedProps.behaviorModule,
@@ -321,7 +341,7 @@ export class ThreadPool {
         if (!this.alive)
             return;
         this.workers[workerIndex].postMessage({
-            type: 2 /* WorkerMsgType.Tell */,
+            type: WorkerMsgType.Tell,
             targetPath,
             message,
             senderPath,
@@ -336,7 +356,7 @@ export class ThreadPool {
             }, timeoutMs);
             this.pendingAsks.set(correlationId, { resolve, reject, timer });
             this.workers[workerIndex].postMessage({
-                type: 5 /* WorkerMsgType.Ask */,
+                type: WorkerMsgType.Ask,
                 targetPath,
                 message,
                 correlationId,
@@ -347,7 +367,7 @@ export class ThreadPool {
         if (!this.alive)
             return;
         this.workers[workerIndex].postMessage({
-            type: 3 /* WorkerMsgType.StopActor */,
+            type: WorkerMsgType.StopActor,
             actorPath,
         });
     }
@@ -368,7 +388,7 @@ export class ThreadPool {
     // ========================================================================
     handleWorkerMessage(workerIndex, msg) {
         switch (msg.type) {
-            case 10 /* WorkerMsgType.ActorCreated */: {
+            case WorkerMsgType.ActorCreated: {
                 const pending = this.pendingCreations.get(msg.actorPath);
                 if (pending) {
                     this.pendingCreations.delete(msg.actorPath);
@@ -378,7 +398,7 @@ export class ThreadPool {
                 }
                 break;
             }
-            case 12 /* WorkerMsgType.TellProxy */: {
+            case WorkerMsgType.TellProxy: {
                 // Worker actor wants to send to another actor — route it
                 if (this.onTellProxy) {
                     this.onTellProxy(msg.targetPath, msg.message, msg.senderPath);
@@ -389,7 +409,7 @@ export class ThreadPool {
                 }
                 break;
             }
-            case 13 /* WorkerMsgType.AskReply */: {
+            case WorkerMsgType.AskReply: {
                 const pending = this.pendingAsks.get(msg.correlationId);
                 if (pending) {
                     clearTimeout(pending.timer);
@@ -403,11 +423,11 @@ export class ThreadPool {
                 }
                 break;
             }
-            case 14 /* WorkerMsgType.ActorStopped */: {
+            case WorkerMsgType.ActorStopped: {
                 this.actorRegistry.delete(msg.actorPath);
                 break;
             }
-            case 15 /* WorkerMsgType.Log */: {
+            case WorkerMsgType.Log: {
                 const fn = msg.level === 'error'
                     ? console.error
                     : msg.level === 'warn'
@@ -416,7 +436,7 @@ export class ThreadPool {
                 fn(`[actor-bonilla/Worker-${workerIndex}]`, msg.message);
                 break;
             }
-            case 16 /* WorkerMsgType.Error */: {
+            case WorkerMsgType.Error: {
                 console.error(`[actor-bonilla/Worker-${workerIndex}] Actor ${msg.actorPath} error:`, msg.error);
                 break;
             }
@@ -448,7 +468,7 @@ export class ThreadPool {
             return new Promise((resolve) => {
                 worker.once('exit', () => resolve());
                 worker.postMessage({
-                    type: 4 /* WorkerMsgType.Shutdown */,
+                    type: WorkerMsgType.Shutdown,
                 });
                 // Force kill after 2 seconds
                 setTimeout(() => {

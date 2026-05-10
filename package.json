@@ -31,8 +31,8 @@
     "run": "tsx src/index.ts",
     "build": "tsc",
     "prettier": "prettier --write src/**/*.ts",
-    "test": "jest",
-    "test:coverage": "jest --coverage",
+    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --runInBand",
+    "test:coverage": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --runInBand --coverage",
     "demo": "tsx examples/demo.ts",
     "bench": "tsx src/benchmark.ts"
   },
@@ -52,6 +52,7 @@
     "@swc/jest": "0.2.39",
     "@types/jest": "30.0.0",
     "@types/node": "25.6.2",
+    "cross-env": "^10.1.0",
     "jest": "30.4.2",
     "prettier": "3.8.3",
     "ts-jest": "^29.4.9",

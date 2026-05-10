@@ -3,6 +3,9 @@
 // Measures raw message throughput, latency, and actor creation speed.
 // ============================================================================
 
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { ActorSystem, props, type ActorRef } from './index.js';
 
 function formatNum(n: number): string {
@@ -274,4 +277,14 @@ async function main() {
   console.log('\n✅ All benchmarks complete.\n');
 }
 
-main().catch(console.error);
+function isMainBenchmark(): boolean {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  return (
+    path.resolve(entry) === path.resolve(fileURLToPath(import.meta.url))
+  );
+}
+
+if (isMainBenchmark()) {
+  main().catch(console.error);
+}
