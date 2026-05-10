@@ -1,245 +1,731 @@
-/**
- * Fetch-based HTTP client with timeouts, retries, and hooks (Got-inspired ergonomics).
- * Uses global `fetch` (Node 20+ ships Undici-backed fetch).
- */
+// ============================================================================
+// @actor-bonilla/http — HttpClient
+//
+// Full-featured HTTP client on top of Node 20's global fetch (Undici-backed).
+// Integration with @actor-bonilla/core:
+//   • ActorSystem's EventStream publishes download/upload progress.
+//   • A shared CacheActor manages RFC-lite response caching as actor state.
+//   • A Semaphore enforces maxConcurrent request limits.
+// ============================================================================
 
-export type HttpMethod =
-  | 'GET'
-  | 'POST'
-  | 'PUT'
-  | 'PATCH'
-  | 'DELETE'
-  | 'HEAD'
-  | 'OPTIONS'
-  | 'TRACE';
+import { ActorSystem, type ActorRef, type EventClassifier } from '@actor-bonilla/core';
+import {
+  type Options,
+  type NormalizedOptions,
+  type HttpResponse,
+  type Timings,
+  type ProgressEvent,
+  type CacheEntry,
+  type CacheStore,
+  HTTP_PROGRESS_CHANNEL,
+  HTTP_REQUEST_CHANNEL,
+  HTTP_RESPONSE_CHANNEL,
+  HTTP_ERROR_CHANNEL,
+  type HttpProgressEvent,
+} from './types.js';
+import { HTTPError, TimeoutError, ParseError, MaxRedirectsError, normalizeError, RequestError } from './errors.js';
+import { normalizeOptions, mergeOptionObjects } from './normalize.js';
+import {
+  buildCacheKey,
+  computeTtl,
+  extractVaryHeaders,
+  isCacheableMethod,
+  isCacheableStatus,
+  isStale,
+} from './cache.js';
+import { Semaphore } from './semaphore.js';
+import { defaultRetryDelay, IDEMPOTENT_METHODS } from './defaults.js';
+import { cacheActorProps, type CacheMsg } from './actors/cache.js';
 
-/** Status codes that default retry considers retryable (along with network failures). */
-export const DEFAULT_RETRY_STATUS_CODES: ReadonlySet<number> = new Set([
-  408, 413, 429, 500, 502, 503, 504, 521, 522, 524,
-]);
+export { HTTP_PROGRESS_CHANNEL, HTTP_REQUEST_CHANNEL, HTTP_RESPONSE_CHANNEL, HTTP_ERROR_CHANNEL };
 
-export interface HttpRetryOptions {
-  /** Max retry attempts after the first request (total tries = limit + 1). */
-  limit: number;
-  /** HTTP methods eligible for retry; defaults to GET, PUT, HEAD, DELETE, OPTIONS, TRACE */
-  methods?: HttpMethod[];
-  /** Override retryable status codes (defaults to {@link DEFAULT_RETRY_STATUS_CODES}). */
-  statusCodes?: ReadonlySet<number>;
-  /** Delay before attempt `attempt` (1-based). */
-  calculateDelay?: (attempt: number) => number;
+// ─── Retry-With sentinel ─────────────────────────────────────────────────────
+
+const RETRY_WITH = Symbol('retryWith');
+
+class RetryWithMergedOptions {
+  readonly [RETRY_WITH] = true as const;
+  constructor(readonly merged: NormalizedOptions) {}
 }
 
-export interface HttpHooks {
-  beforeRequest?: (request: Request) => Request | Promise<Request>;
-  afterResponse?: (
-    response: Response,
-    request: Request
-  ) => Response | Promise<Response>;
-  beforeRetry?: (
-    error: unknown,
-    attempt: number,
-    request: Request
-  ) => void | Promise<void>;
-}
-
-export interface HttpClientOptions {
-  /** Prepended to relative URLs (trailing slash optional). */
-  prefixUrl?: string | URL;
-  /** Default headers merged into every request. */
-  headers?: HeadersInit;
-  /** Abort after this many milliseconds (merged with `init.signal`). */
-  timeoutMs?: number;
-  retry?: HttpRetryOptions;
-  hooks?: HttpHooks;
-  /** Inject fetch (tests or custom Undici dispatcher). */
-  fetch?: typeof fetch;
-}
-
-function mergeHeaders(...parts: (HeadersInit | undefined)[]): Headers {
-  const out = new Headers();
-  for (const part of parts) {
-    if (part === undefined) continue;
-    new Headers(part).forEach((value, key) => {
-      out.set(key, value);
-    });
-  }
-  return out;
-}
-
-export function defaultRetryDelay(attempt: number): number {
-  const jitter = Math.random() * 80;
-  return Math.min(350 * 2 ** (attempt - 1), 35_000) + jitter;
-}
-
-function methodAllowsRetry(method: string, retry: HttpRetryOptions): boolean {
-  const allowed = retry.methods ?? [
-    'GET',
-    'PUT',
-    'HEAD',
-    'DELETE',
-    'OPTIONS',
-    'TRACE',
-  ];
-  return allowed.includes(method.toUpperCase() as HttpMethod);
-}
-
-function shouldRetryStatus(
-  code: number,
-  retry: HttpRetryOptions,
-  method: string
-): boolean {
-  if (!methodAllowsRetry(method, retry)) return false;
-  const set = retry.statusCodes ?? DEFAULT_RETRY_STATUS_CODES;
-  return set.has(code);
-}
-
-function combineSignals(signals: AbortSignal[]): AbortSignal | undefined {
-  if (signals.length === 0) return undefined;
-  if (signals.length === 1) return signals[0];
-  if (typeof AbortSignal.any === 'function') {
-    return AbortSignal.any(signals);
-  }
-  const controller = new AbortController();
-  const onAbort = () => controller.abort();
-  for (const s of signals) {
-    if (s.aborted) {
-      controller.abort();
-      break;
-    }
-    s.addEventListener('abort', onAbort, { once: true });
-  }
-  return controller.signal;
-}
-
-export class HttpClient {
-  private readonly options: HttpClientOptions;
-
-  constructor(options: HttpClientOptions = {}) {
-    this.options = options;
-  }
-
-  private resolveUrl(url: string | URL): string {
-    const href = typeof url === 'string' ? url : url.href;
-    if (!this.options.prefixUrl) return href;
-    return new URL(href, this.options.prefixUrl).href;
-  }
-
-  private async buildRequest(url: string, init: RequestInit): Promise<Request> {
-    const headers = mergeHeaders(this.options.headers, init.headers);
-    let req = new Request(url, { ...init, headers });
-    if (this.options.hooks?.beforeRequest) {
-      req = await this.options.hooks.beforeRequest(req);
-    }
-    return req;
-  }
-
-  async request(url: string | URL, init: RequestInit = {}): Promise<Response> {
-    const fetchFn = this.options.fetch ?? globalThis.fetch;
-    const resolved = this.resolveUrl(url);
-    const retryCfg = this.options.retry;
-    const maxAttempts = retryCfg ? retryCfg.limit + 1 : 1;
-
-    let lastError: unknown;
-
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      const timeoutController =
-        this.options.timeoutMs !== undefined
-          ? new AbortController()
-          : null;
-      const timer =
-        timeoutController &&
-        setTimeout(() => timeoutController.abort(), this.options.timeoutMs);
-
-      try {
-        const signals: AbortSignal[] = [];
-        if (init.signal) signals.push(init.signal);
-        if (timeoutController) signals.push(timeoutController.signal);
-        const mergedSignal = combineSignals(signals);
-
-        let req = await this.buildRequest(resolved, {
-          ...init,
-          signal: mergedSignal ?? init.signal,
-        });
-
-        let res = await fetchFn(req);
-
-        if (timer) clearTimeout(timer);
-
-        if (
-          retryCfg &&
-          attempt < maxAttempts &&
-          shouldRetryStatus(
-            res.status,
-            retryCfg,
-            req.method
-          )
-        ) {
-          await this.options.hooks?.beforeRetry?.(
-            new Error(`HTTP ${res.status}`),
-            attempt,
-            req
-          );
-          await sleep(
-            retryCfg.calculateDelay?.(attempt) ?? defaultRetryDelay(attempt)
-          );
-          continue;
-        }
-
-        if (this.options.hooks?.afterResponse) {
-          res = await this.options.hooks.afterResponse(res, req);
-        }
-
-        return res;
-      } catch (err) {
-        lastError = err;
-        if (timer) clearTimeout(timer);
-
-        if (
-          !retryCfg ||
-          attempt >= maxAttempts ||
-          !methodAllowsRetry(
-            (init.method ?? 'GET').toUpperCase(),
-            retryCfg
-          )
-        ) {
-          throw err;
-        }
-
-        await this.options.hooks?.beforeRetry?.(err, attempt, new Request(resolved, init));
-        await sleep(
-          retryCfg.calculateDelay?.(attempt) ?? defaultRetryDelay(attempt)
-        );
-      }
-    }
-
-    throw lastError ?? new Error('HTTP request failed');
-  }
-
-  get(url: string | URL, init?: RequestInit): Promise<Response> {
-    return this.request(url, { ...init, method: 'GET' });
-  }
-
-  post(url: string | URL, init?: RequestInit): Promise<Response> {
-    return this.request(url, { ...init, method: 'POST' });
-  }
-
-  put(url: string | URL, init?: RequestInit): Promise<Response> {
-    return this.request(url, { ...init, method: 'PUT' });
-  }
-
-  patch(url: string | URL, init?: RequestInit): Promise<Response> {
-    return this.request(url, { ...init, method: 'PATCH' });
-  }
-
-  delete(url: string | URL, init?: RequestInit): Promise<Response> {
-    return this.request(url, { ...init, method: 'DELETE' });
-  }
-
-  head(url: string | URL, init?: RequestInit): Promise<Response> {
-    return this.request(url, { ...init, method: 'HEAD' });
-  }
-}
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function combineAbortSignals(signals: (AbortSignal | undefined)[]): {
+  signal: AbortSignal | undefined;
+  cleanup: () => void;
+} {
+  const valid = signals.filter((s): s is AbortSignal => s !== undefined);
+  if (valid.length === 0) return { signal: undefined, cleanup: () => {} };
+  if (valid.length === 1) return { signal: valid[0], cleanup: () => {} };
+  if (typeof AbortSignal.any === 'function') {
+    return { signal: AbortSignal.any(valid), cleanup: () => {} };
+  }
+  const ctrl = new AbortController();
+  const listeners: Array<() => void> = [];
+  for (const s of valid) {
+    const fn = () => ctrl.abort(s.reason);
+    s.addEventListener('abort', fn, { once: true });
+    listeners.push(() => s.removeEventListener('abort', fn));
+  }
+  return {
+    signal: ctrl.signal,
+    cleanup: () => listeners.forEach((fn) => fn()),
+  };
+}
+
+function parseRetryAfter(header: string): number | undefined {
+  const n = Number(header);
+  if (Number.isFinite(n) && n >= 0) return n * 1_000; // seconds → ms
+  const d = new Date(header).getTime();
+  if (Number.isFinite(d)) return Math.max(0, d - Date.now());
+  return undefined;
+}
+
+async function readBody<T>(
+  response: Response,
+  options: NormalizedOptions,
+  system: ActorSystem,
+  onDownloadProgress?: (e: ProgressEvent) => void
+): Promise<{ body: T; downloadMs: number }> {
+  const start = Date.now();
+  const contentLength = response.headers.get('content-length');
+  const total = contentLength ? parseInt(contentLength, 10) : undefined;
+  const url = options.url.href;
+
+  const emit = (transferred: number) => {
+    const pct = total ? transferred / total : 0;
+    const event: ProgressEvent = { percent: pct, transferred, total };
+    onDownloadProgress?.(event);
+    system.eventStream.publish<HttpProgressEvent>(HTTP_PROGRESS_CHANNEL as EventClassifier, {
+      url,
+      direction: 'download',
+      progress: event,
+    });
+  };
+
+  if (options.responseType === 'stream') {
+    // Return the raw stream body — don't consume
+    return { body: response.body as unknown as T, downloadMs: 0 };
+  }
+
+  if (!response.body) {
+    return { body: '' as unknown as T, downloadMs: 0 };
+  }
+
+  // Stream body reading with progress tracking
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let transferred = 0;
+
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) {
+        chunks.push(value);
+        transferred += value.byteLength;
+        emit(transferred);
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  emit(transferred);
+
+  const downloadMs = Date.now() - start;
+  const allBytes = chunks.reduce((acc, c) => {
+    const merged = new Uint8Array(acc.byteLength + c.byteLength);
+    merged.set(acc);
+    merged.set(c, acc.byteLength);
+    return merged;
+  }, new Uint8Array(0));
+
+  switch (options.responseType) {
+    case 'buffer': {
+      return { body: Buffer.from(allBytes) as unknown as T, downloadMs };
+    }
+    case 'json': {
+      const text = new TextDecoder(options.encoding).decode(allBytes);
+      try {
+        return { body: JSON.parse(text) as T, downloadMs };
+      } catch (e) {
+        throw new ParseError(e as Error, options);
+      }
+    }
+    default: {
+      // 'text'
+      return {
+        body: new TextDecoder(options.encoding).decode(allBytes) as unknown as T,
+        downloadMs,
+      };
+    }
+  }
+}
+
+function buildFetchInit(options: NormalizedOptions, signal?: AbortSignal): RequestInit {
+  const init: RequestInit = {
+    method: options.method,
+    headers: options.headers,
+    credentials: options.credentials,
+    signal,
+  };
+
+  // Body selection: json > form > body
+  if (options.json !== undefined) {
+    init.body = JSON.stringify(options.json);
+  } else if (options.form !== undefined) {
+    const usp = new URLSearchParams();
+    for (const [k, v] of Object.entries(options.form)) {
+      usp.append(k, String(v));
+    }
+    init.body = usp.toString();
+  } else if (options.body !== undefined) {
+    init.body = options.body;
+  }
+
+  return init;
+}
+
+function isNetworkError(err: unknown): boolean {
+  const code = (err as NodeJS.ErrnoException)?.code;
+  return (
+    code !== undefined &&
+    [
+      'ETIMEDOUT', 'ECONNRESET', 'EADDRINUSE', 'ECONNREFUSED',
+      'EPIPE', 'ENOTFOUND', 'ENETUNREACH', 'EAI_AGAIN',
+    ].includes(code)
+  );
+}
+
+// ─── HttpClient ───────────────────────────────────────────────────────────────
+
+export class HttpClient {
+  private readonly baseOptions: Partial<Options>;
+  private readonly system: ActorSystem;
+  private readonly ownedSystem: boolean;
+  private readonly semaphore: Semaphore;
+  private readonly cacheActor: ActorRef<CacheMsg>;
+
+  /**
+   * The underlying actor system — subscribe to `HTTP_PROGRESS_CHANNEL`,
+   * `HTTP_REQUEST_CHANNEL`, etc. via `client.actorSystem.eventStream`.
+   */
+  get actorSystem(): ActorSystem {
+    return this.system;
+  }
+
+  constructor(options: Partial<Options> = {}) {
+    this.baseOptions = options;
+    this.ownedSystem = !options.actorSystem;
+    this.system =
+      options.actorSystem ??
+      new ActorSystem({ name: '@actor-bonilla/http', logDeadLetters: false });
+
+    this.semaphore = new Semaphore(options.maxConcurrent ?? 256);
+
+    const cacheStore = resolveCacheStore(options.cache);
+    this.cacheActor = this.system.actorOf<CacheMsg>(
+      cacheActorProps(cacheStore),
+      `http-cache-${Math.random().toString(36).slice(2)}`
+    );
+  }
+
+  // ─── Core request method ────────────────────────────────────────────────────
+
+  async request<T = unknown>(
+    url: string | URL,
+    options: Partial<Options> = {}
+  ): Promise<HttpResponse<T>> {
+    const normalized = normalizeOptions(
+      mergeOptionObjects(this.baseOptions, { url, ...options })
+    );
+
+    // Publish request start
+    this.system.eventStream.publish(HTTP_REQUEST_CHANNEL as EventClassifier, {
+      url: normalized.url.href,
+      method: normalized.method,
+    });
+
+    await this.semaphore.acquire();
+    try {
+      const result = await this.execute<T>(normalized, 0, []);
+      if (normalized.resolveBodyOnly) {
+        return result.body as unknown as HttpResponse<T>;
+      }
+      return result;
+    } finally {
+      this.semaphore.release();
+    }
+  }
+
+  // ─── Private execution engine ────────────────────────────────────────────────
+
+  private async execute<T>(
+    options: NormalizedOptions,
+    retryCount: number,
+    redirectUrls: string[]
+  ): Promise<HttpResponse<T>> {
+    // Run beforeRequest hooks
+    let currentOptions = options;
+    for (const hook of currentOptions.hooks.beforeRequest) {
+      const result = await hook(currentOptions);
+      if (result && typeof result === 'object' && 'url' in result) {
+        currentOptions = result as NormalizedOptions;
+      }
+    }
+
+    // Check cache
+    if (currentOptions.cache && isCacheableMethod(currentOptions.method)) {
+      const cached = await this.checkCache<T>(currentOptions);
+      if (cached) return { ...cached, retryCount, redirectUrls };
+    }
+
+    // Timeout logic
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const timeoutController = new AbortController();
+    const { request: reqTimeout } = currentOptions.timeout;
+
+    if (reqTimeout && reqTimeout > 0) {
+      const t = setTimeout(() => timeoutController.abort(), reqTimeout);
+      timers.push(t);
+    }
+
+    const { signal: mergedSignal, cleanup } = combineAbortSignals([
+      currentOptions.signal,
+      timeoutController.signal,
+    ]);
+
+    const timings: Timings = {
+      start: Date.now(),
+      phases: {},
+    };
+
+    let rawResponse: Response;
+    try {
+      const init = buildFetchInit(currentOptions, mergedSignal);
+      rawResponse = await globalThis.fetch(currentOptions.url.href, init);
+      timings.response = Date.now();
+      timings.phases.firstByte = timings.response - timings.start;
+    } catch (err) {
+      timers.forEach(clearTimeout);
+      cleanup();
+
+      const isTimeout =
+        timeoutController.signal.aborted ||
+        (err instanceof Error && err.name === 'AbortError');
+
+      const normalised = isTimeout
+        ? new TimeoutError('request', currentOptions)
+        : normalizeError(err, currentOptions);
+
+      // Run beforeError hooks
+      let finalErr: RequestError = normalised;
+      for (const hook of currentOptions.hooks.beforeError) {
+        finalErr = await hook(finalErr);
+      }
+
+      // Retry on network error
+      if (
+        isNetworkError(err) &&
+        retryCount < currentOptions.retry.limit &&
+        IDEMPOTENT_METHODS.has(currentOptions.method)
+      ) {
+        return this.retryAfterDelay<T>(currentOptions, retryCount, redirectUrls, finalErr);
+      }
+
+      this.system.eventStream.publish(HTTP_ERROR_CHANNEL as EventClassifier, {
+        url: currentOptions.url.href,
+        error: finalErr,
+      });
+      throw finalErr;
+    }
+
+    timers.forEach(clearTimeout);
+    cleanup();
+
+    // Read body
+    let body: T;
+    let downloadMs: number;
+    try {
+      ({ body, downloadMs } = await readBody<T>(
+        rawResponse,
+        currentOptions,
+        this.system,
+        currentOptions.onDownloadProgress
+      ));
+    } catch (err) {
+      if (err instanceof RequestError) {
+        throw err;
+      }
+      throw normalizeError(err, currentOptions);
+    }
+
+    timings.end = Date.now();
+    timings.phases.download = downloadMs;
+    timings.phases.total = timings.end - timings.start;
+
+    let httpResponse: HttpResponse<T> = {
+      url: rawResponse.url || currentOptions.url.href,
+      statusCode: rawResponse.status,
+      statusMessage: rawResponse.statusText,
+      headers: rawResponse.headers,
+      redirectUrls,
+      retryCount,
+      requestCount: retryCount + 1 + redirectUrls.length,
+      timings,
+      body,
+      rawResponse,
+      fromCache: false,
+    };
+
+    // Run afterResponse hooks
+    for (const hook of currentOptions.hooks.afterResponse) {
+      try {
+        httpResponse = (await hook(httpResponse, async (retryOpts) => {
+          const merged = normalizeOptions(
+            mergeOptionObjects(currentOptions as unknown as Partial<Options>, retryOpts)
+          );
+          throw new RetryWithMergedOptions(merged);
+        })) as HttpResponse<T>;
+      } catch (err) {
+        if (err instanceof RetryWithMergedOptions) {
+          return this.execute<T>(err.merged, retryCount, redirectUrls);
+        }
+        throw err;
+      }
+    }
+
+    // Retry on status code
+    if (
+      retryCount < currentOptions.retry.limit &&
+      currentOptions.retry.statusCodes.includes(httpResponse.statusCode) &&
+      IDEMPOTENT_METHODS.has(currentOptions.method)
+    ) {
+      const retryAfterMs = parseRetryAfter(
+        rawResponse.headers.get('retry-after') ?? ''
+      );
+      const error = new HTTPError(httpResponse, currentOptions);
+      return this.retryAfterDelay<T>(currentOptions, retryCount, redirectUrls, error, retryAfterMs);
+    }
+
+    // Throw on HTTP errors
+    if (
+      currentOptions.throwHttpErrors &&
+      httpResponse.statusCode >= 400
+    ) {
+      let error: RequestError = new HTTPError(httpResponse, currentOptions);
+      for (const hook of currentOptions.hooks.beforeError) {
+        error = await hook(error);
+      }
+      this.system.eventStream.publish(HTTP_ERROR_CHANNEL as EventClassifier, {
+        url: currentOptions.url.href,
+        error,
+      });
+      throw error;
+    }
+
+    // Store in cache
+    if (
+      currentOptions.cache &&
+      isCacheableMethod(currentOptions.method) &&
+      isCacheableStatus(httpResponse.statusCode)
+    ) {
+      await this.storeCache(currentOptions, httpResponse);
+    }
+
+    // Publish response event
+    this.system.eventStream.publish(HTTP_RESPONSE_CHANNEL as EventClassifier, {
+      url: httpResponse.url,
+      statusCode: httpResponse.statusCode,
+    });
+
+    return httpResponse;
+  }
+
+  // ─── Retry helper ─────────────────────────────────────────────────────────
+
+  private async retryAfterDelay<T>(
+    options: NormalizedOptions,
+    retryCount: number,
+    redirectUrls: string[],
+    error: RequestError,
+    retryAfterMs?: number
+  ): Promise<HttpResponse<T>> {
+    const computedDelay = defaultRetryDelay(retryCount + 1, undefined);
+    const delay = Math.min(
+      options.retry.calculateDelay({
+        retryCount: retryCount + 1,
+        retryAfter: retryAfterMs,
+        error,
+        computedValue: computedDelay,
+      }),
+      options.retry.backoffLimit
+    );
+
+    for (const hook of options.hooks.beforeRetry) {
+      await hook({ options, error, retryCount });
+    }
+
+    await sleep(delay);
+    return this.execute<T>(options, retryCount + 1, redirectUrls);
+  }
+
+  // ─── Cache helpers ─────────────────────────────────────────────────────────
+
+  private async checkCache<T>(
+    options: NormalizedOptions
+  ): Promise<HttpResponse<T> | null> {
+    const key = buildCacheKey(options.method, options.url);
+    let entry: CacheEntry | null;
+    try {
+      entry = await this.cacheActor.ask<CacheEntry | null>(
+        { type: 'GET', key } as CacheMsg,
+        2_000
+      );
+    } catch {
+      return null;
+    }
+    if (!entry || isStale(entry)) return null;
+
+    const headers = new Headers(entry.headers);
+    const body = options.responseType === 'json'
+      ? (JSON.parse(entry.body) as T)
+      : (entry.body as unknown as T);
+
+    const response: HttpResponse<T> = {
+      url: entry.url,
+      statusCode: entry.statusCode,
+      statusMessage: 'OK',
+      headers,
+      redirectUrls: [],
+      retryCount: 0,
+      requestCount: 1,
+      timings: { start: entry.timestamp, phases: {} },
+      body,
+      rawResponse: new Response(entry.body, {
+        status: entry.statusCode,
+        headers,
+      }),
+      fromCache: true,
+    };
+    return response;
+  }
+
+  private async storeCache(
+    options: NormalizedOptions,
+    response: HttpResponse
+  ): Promise<void> {
+    const headers: Record<string, string> = {};
+    response.headers.forEach((v, k) => { headers[k] = v; });
+
+    const ttl = computeTtl(response.headers);
+    if (ttl === undefined) return; // no-store
+
+    const vary = extractVaryHeaders(response.headers, options.headers);
+    const key = buildCacheKey(options.method, options.url, vary);
+
+    const entry: CacheEntry = {
+      statusCode: response.statusCode,
+      headers,
+      body: typeof response.body === 'string'
+        ? response.body
+        : JSON.stringify(response.body),
+      url: response.url,
+      timestamp: Date.now(),
+      ttl,
+      etag: response.headers.get('etag') ?? undefined,
+      lastModified: response.headers.get('last-modified') ?? undefined,
+      vary,
+    };
+
+    this.cacheActor.tell({ type: 'SET', key, entry, ttl } as CacheMsg);
+  }
+
+  // ─── Convenience HTTP methods ───────────────────────────────────────────────
+
+  get<T = unknown>(url: string | URL, options?: Partial<Options>): Promise<HttpResponse<T>> {
+    return this.request<T>(url, { ...options, method: 'GET' });
+  }
+
+  post<T = unknown>(url: string | URL, options?: Partial<Options>): Promise<HttpResponse<T>> {
+    return this.request<T>(url, { ...options, method: 'POST' });
+  }
+
+  put<T = unknown>(url: string | URL, options?: Partial<Options>): Promise<HttpResponse<T>> {
+    return this.request<T>(url, { ...options, method: 'PUT' });
+  }
+
+  patch<T = unknown>(url: string | URL, options?: Partial<Options>): Promise<HttpResponse<T>> {
+    return this.request<T>(url, { ...options, method: 'PATCH' });
+  }
+
+  delete<T = unknown>(url: string | URL, options?: Partial<Options>): Promise<HttpResponse<T>> {
+    return this.request<T>(url, { ...options, method: 'DELETE' });
+  }
+
+  head<T = unknown>(url: string | URL, options?: Partial<Options>): Promise<HttpResponse<T>> {
+    return this.request<T>(url, { ...options, method: 'HEAD' });
+  }
+
+  options<T = unknown>(url: string | URL, options?: Partial<Options>): Promise<HttpResponse<T>> {
+    return this.request<T>(url, { ...options, method: 'OPTIONS' });
+  }
+
+  // ─── Streaming ─────────────────────────────────────────────────────────────
+
+  /**
+   * Returns the raw ReadableStream<Uint8Array> body without consuming it.
+   * The underlying Response is in 'stream' mode — no retries or body parsing.
+   */
+  async stream(url: string | URL, options?: Partial<Options>): Promise<ReadableStream<Uint8Array>> {
+    const resp = await this.request<ReadableStream<Uint8Array>>(url, {
+      ...options,
+      responseType: 'stream',
+    });
+    if (!resp.body) throw new Error('Response has no body stream');
+    return resp.body;
+  }
+
+  // ─── JSON shortcut ─────────────────────────────────────────────────────────
+
+  /**
+   * GET and parse the response body as JSON.
+   * Equivalent to `.get(url, { responseType: 'json' })` then `.body`.
+   */
+  async getJson<T = unknown>(url: string | URL, options?: Partial<Options>): Promise<T> {
+    const resp = await this.get<T>(url, { ...options, responseType: 'json' });
+    return resp.body;
+  }
+
+  /**
+   * POST JSON and return the parsed response body.
+   */
+  async postJson<T = unknown>(
+    url: string | URL,
+    json: unknown,
+    options?: Partial<Options>
+  ): Promise<T> {
+    const resp = await this.post<T>(url, { ...options, json, responseType: 'json' });
+    return resp.body;
+  }
+
+  // ─── Pagination (async generator) ─────────────────────────────────────────
+
+  async *paginate<T = unknown>(
+    url: string | URL,
+    options: Partial<Options> = {}
+  ): AsyncGenerator<T> {
+    const paginateOptions = options.pagination;
+    if (!paginateOptions?.paginate) {
+      throw new TypeError('options.pagination.paginate function is required for .paginate()');
+    }
+
+    const allItems: T[] = [];
+    let currentOptions: Partial<Options> = { ...options, url };
+    let requestCount = 0;
+
+    for (;;) {
+      const resp = await this.request<unknown>(url, currentOptions);
+      requestCount++;
+
+      const rawItems: T[] = paginateOptions.transform
+        ? (await paginateOptions.transform(resp as HttpResponse)) as T[]
+        : Array.isArray(resp.body)
+          ? (resp.body as T[])
+          : [];
+
+      const filtered: T[] = paginateOptions.filter
+        ? rawItems.filter((item: T) => paginateOptions.filter!(item, allItems, rawItems))
+        : rawItems;
+
+      for (const item of filtered) {
+        if (paginateOptions.countLimit !== undefined && allItems.length >= paginateOptions.countLimit) {
+          return;
+        }
+        if (
+          paginateOptions.shouldContinue &&
+          !paginateOptions.shouldContinue(item, allItems, filtered)
+        ) {
+          return;
+        }
+        if (paginateOptions.stackAllItems !== false) {
+          allItems.push(item);
+        }
+        yield item;
+      }
+
+      if (
+        paginateOptions.requestLimit !== undefined &&
+        requestCount >= paginateOptions.requestLimit
+      ) {
+        return;
+      }
+
+      const next = await paginateOptions.paginate(
+        resp as HttpResponse,
+        allItems,
+        filtered
+      );
+      if (!next) return;
+
+      if (paginateOptions.backoff && paginateOptions.backoff > 0) {
+        await sleep(paginateOptions.backoff);
+      }
+
+      currentOptions = mergeOptionObjects(currentOptions, next);
+      url = (next.url ?? (next.searchParams ? currentOptions.url! : url)) as string | URL;
+    }
+  }
+
+  // ─── Extend (create a derived client inheriting all options) ───────────────
+
+  /**
+   * Create a new HttpClient that inherits the current client's options,
+   * deep-merging hooks arrays. The new client shares the same ActorSystem
+   * unless `options.actorSystem` is overridden.
+   */
+  extend(options: Partial<Options>): HttpClient {
+    const merged = mergeOptionObjects(this.baseOptions, {
+      actorSystem: this.system,
+      ...options,
+    });
+    return new HttpClient(merged);
+  }
+
+  /**
+   * Gracefully shut down the actor system (only when this client created it).
+   * Noop when the system was provided externally.
+   */
+  async destroy(): Promise<void> {
+    this.cacheActor.stop();
+    if (this.ownedSystem) {
+      await this.system.terminate();
+    }
+  }
+
+  // ─── Cache control ─────────────────────────────────────────────────────────
+
+  /** Purge all cached responses managed by this client's cache actor. */
+  clearCache(): void {
+    this.cacheActor.tell({ type: 'CLEAR' } as CacheMsg);
+  }
+}
+
+// ─── Module-level factory (Got-style top-level usage) ────────────────────────
+
+export const http = new HttpClient();
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+import { MemoryCache } from './cache.js';
+
+function resolveCacheStore(cache: Options['cache']): CacheStore {
+  if (!cache) return new MemoryCache();
+  if (cache === true) return new MemoryCache();
+  return cache;
 }
