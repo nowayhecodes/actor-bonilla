@@ -16,6 +16,9 @@
 |--------|-------------|
 | [@actor-bonilla/core](packages/core/README.md) | Mailboxes, supervision, routers, FSM, pub/sub, optional worker-thread actors |
 | [@actor-bonilla/http](packages/http/README.md) | Native `fetch` HTTP client with retries and hooks |
+| [@actor-bonilla/native](packages/native/README.md) | Optional Zig Node-API addon — ships **prebuilt** binaries (no compile on `npm install`; same goal as [prebuildify](https://github.com/prebuild/prebuildify)) |
+
+Native acceleration is loaded only when prebuilds are published with the package; see [packages/native/README.md](packages/native/README.md).
 
 ## Contributing
 

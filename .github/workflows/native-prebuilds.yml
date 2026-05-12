@@ -1,0 +1,80 @@
+# Builds Zig `.node` prebuilds for publishing `@actor-bonilla/native`.
+# Artifacts are uploaded per job; maintainers merge folders under packages/native/prebuilds/
+# before npm publish. Same distribution goal as prebuildify—bundled binaries, no compile on install.
+#
+# Trigger: Actions → Native prebuilds → Run workflow.
+
+name: Native prebuilds
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux-and-windows:
+    name: linux-x64, linux-arm64, win32-x64 (Zig cross-compile)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Zig 0.14.0
+        run: |
+          curl -fsSL https://ziglang.org/download/0.14.0/zig-linux-x86_64-0.14.0.tar.xz -o zig.tar.xz
+          tar -xf zig.tar.xz
+          echo "${PWD}/zig-linux-x86_64-0.14.0" >> "$GITHUB_PATH"
+
+      - name: Build targets
+        run: |
+          chmod +x scripts/build-native.sh
+          ./scripts/build-native.sh --target linux-x64
+          ./scripts/build-native.sh --target linux-arm64
+          ./scripts/build-native.sh --target win32-x64
+
+      - name: Upload prebuilds (Linux / Windows)
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-prebuilds-linux-win
+          path: packages/native/prebuilds/
+
+  darwin:
+    name: darwin-arm64, darwin-x64
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Zig 0.14.0
+        run: |
+          ARCH="$(uname -m)"
+          case "$ARCH" in
+            arm64) ZIG_ARCH=aarch64 ;;
+            *) ZIG_ARCH=x86_64 ;;
+          esac
+          curl -fsSL "https://ziglang.org/download/0.14.0/zig-macos-${ZIG_ARCH}-0.14.0.tar.xz" -o zig.tar.xz
+          tar -xf zig.tar.xz
+          echo "${PWD}/zig-macos-${ZIG_ARCH}-0.14.0" >> "$GITHUB_PATH"
+
+      - name: Build targets
+        run: |
+          chmod +x scripts/build-native.sh
+          ./scripts/build-native.sh --target darwin-arm64
+          ./scripts/build-native.sh --target darwin-x64
+
+      - name: Upload prebuilds (macOS)
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-prebuilds-darwin
+          path: packages/native/prebuilds/

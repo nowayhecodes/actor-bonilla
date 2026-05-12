@@ -103,3 +103,6 @@ export {
   type MainToWorkerMsg,
   type WorkerToMainMsg,
 } from './thread-pool.js';
+
+// Native Zig backend (optional — gracefully absent when addon is not built)
+export { isNativeAvailable, NativePool, type NativeAddon } from './native-backend.js';

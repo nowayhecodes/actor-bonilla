@@ -31,6 +31,8 @@
   "scripts": {
     "run": "tsx src/index.ts",
     "build": "tsc",
+    "build:native": "node ../../scripts/build-native.js --current-platform",
+    "build:native:all": "node ../../scripts/build-native.js",
     "prettier": "prettier --write src/**/*.ts",
     "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --runInBand --config jest.config.cjs",
     "test:coverage": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --runInBand --coverage --config jest.config.cjs",
@@ -71,6 +73,9 @@
   "dependencies": {
     "@swc/core": "1.15.33",
     "typia": "12.1.1"
+  },
+  "optionalDependencies": {
+    "@actor-bonilla/native": "workspace:*"
   },
   "engines": {
     "node": ">=20"

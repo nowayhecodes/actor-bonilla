@@ -5,6 +5,8 @@
   "scripts": {
     "prepare": "pnpm exec ts-patch install",
     "build": "pnpm -r run build",
+    "build:native": "pnpm --filter @actor-bonilla/core run build:native",
+    "build:native:all": "pnpm --filter @actor-bonilla/core run build:native:all",
     "test": "pnpm -r run test",
     "test:coverage": "pnpm -r run test:coverage",
     "demo": "pnpm --filter @actor-bonilla/core run demo",
